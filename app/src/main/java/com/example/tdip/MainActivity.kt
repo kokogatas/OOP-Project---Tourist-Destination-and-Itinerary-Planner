@@ -26,6 +26,16 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "Hi there!", Toast.LENGTH_SHORT).show()
         }
         */
+
+        val registerButton = findViewById<Button>(R.id.register_button)
+        val continueButton = findViewById<Button>(R.id.continue_button)
+
+        registerButton.setOnClickListener {
+            Toast.makeText(this, "Register button is clicked", Toast.LENGTH_SHORT).show()
+        }
+
+        continueButton.setOnClickListener {
+            Toast.makeText(this, "Continue button is clicked", Toast.LENGTH_SHORT).show()
+        }
     }
 }
-
