@@ -19,11 +19,13 @@ class MainActivity : AppCompatActivity() {
             insets
         }
 
+        /*
         val clickThis = findViewById<Button>(R.id.clickThis)
 
         clickThis.setOnClickListener {
             Toast.makeText(this, "Hi there!", Toast.LENGTH_SHORT).show()
         }
+        */
     }
 }
 
