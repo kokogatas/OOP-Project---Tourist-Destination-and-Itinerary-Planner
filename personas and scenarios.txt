@@ -1,0 +1,29 @@
+Family Vacationer
+  Who: Parents with kids
+    Scenario 1: Find resorts with a pool and kid’s activities, filter by family rooms, view details, add it to the itinerary
+    Scenario 2: Save the resort as a favorite, add swimming day and beach day to the itinerary
+
+Couple / Honeymooner
+  Who: Couples going on a romantic trip
+    Scenario 1: Search for romantic resort, filter by private pool and spa, view pictures and reviews, add it to the itinerary
+    Scenario 2: Save the resort, add 2-day stay and a spa massage to the itinerary
+
+Solo Traveler
+  Who: Person going on their own
+    Scenario 1: Find safe resorts near tours, filter by wifi and breakfast, view details, add it to the itinerary
+    Scenario 2: Save one alternative resort, add a group tour to the itinerary
+
+Budget Backpacker
+  Who: Backpacker on a budget
+    Scenario 1: Search for cheap resorts, filter by breakfast and distance to public transport, view price, add it to the itinerary
+    Scenario 2: Save two other budget resorts, add the cheapest option to the itinerary
+
+Group of Friends
+  Who: Friends going on a trip
+    Scenario 1: Find group-friendly resorts, filter by big rooms and pool, view details, add it to the itinerary
+    Scenario 2: Save two best options, add island-hopping or nightlife to the itinerary
+    
+Local Weekend Explorer
+  Who: Local resident looking for some weekend adventure
+    Scenario 1: Search for resorts near me, filter by offers, view details, add 1-day stay to the itinerary
+    Scenario 2: Save the place, add nearby cafe or massage to the itinerary
