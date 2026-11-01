@@ -3,12 +3,14 @@
     "userId": 1,
     "name": "Mico Tourist",
     "email": "tourist@example.com",
+    "password": "password123",
     "role": "Customer"
   },
   {
     "userId": 2,
     "name": "Admin User",
     "email": "admin@example.com",
+    "password": "admin123",
     "role": "Admin",
     "resortName": "Canyon Cove Resort"
   },
@@ -16,6 +18,7 @@
     "userId": 3,
     "name": "milkkkk",
     "email": "m@g.com",
+    "password": "",
     "role": "Customer"
   }
 ]
