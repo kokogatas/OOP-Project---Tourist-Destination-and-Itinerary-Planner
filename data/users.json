@@ -11,5 +11,11 @@
     "email": "admin@example.com",
     "role": "Admin",
     "resortName": "Canyon Cove Resort"
+  },
+  {
+    "userId": 3,
+    "name": "milkkkk",
+    "email": "m@g.com",
+    "role": "Customer"
   }
 ]
