@@ -20,5 +20,12 @@
     "email": "m@g.com",
     "password": "",
     "role": "Customer"
+  },
+  {
+    "userId": 4,
+    "name": "woah",
+    "email": "g@g.com",
+    "password": "123",
+    "role": "Customer"
   }
 ]
