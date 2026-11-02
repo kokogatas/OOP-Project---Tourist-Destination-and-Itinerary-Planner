@@ -24,16 +24,9 @@
   },
   {
     "userId": 4,
-    "name": "nestea",
+    "name": "ncezz",
     "email": "n@g.com",
-    "password": "123",
-    "role": "Customer"
-  },
-  {
-    "userId": 5,
-    "name": "ncez",
-    "email": "ncez@g.com",
-    "password": "1234",
+    "password": "412",
     "role": "Customer"
   }
 ]
