@@ -1,1 +1,10 @@
-[]
+[
+  {
+    "bookingId": 100,
+    "resortId": 2,
+    "resortName": "Calayo Beach Resort",
+    "checkInDate": "2026-11-04",
+    "checkOutDate": "2026-11-19",
+    "status": "Confirmed"
+  }
+]
