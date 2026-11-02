@@ -27,5 +27,12 @@
     "email": "g@g.con",
     "password": "123",
     "role": "Customer"
+  },
+  {
+    "userId": 5,
+    "name": "nestea",
+    "email": "n@g.com",
+    "password": "123",
+    "role": "Customer"
   }
 ]
