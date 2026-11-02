@@ -6,5 +6,13 @@
     "checkInDate": "2026-11-03",
     "checkOutDate": "2026-11-04",
     "status": "Confirmed"
+  },
+  {
+    "bookingId": 102,
+    "resortId": 5,
+    "resortName": "Canyon Cove",
+    "checkInDate": "2026-11-13",
+    "checkOutDate": "2026-11-16",
+    "status": "Confirmed"
   }
 ]
