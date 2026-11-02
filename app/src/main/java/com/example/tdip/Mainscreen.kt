@@ -1,5 +1,7 @@
 package com.example.tdip
 
+import android.app.DatePickerDialog
+import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.graphics.Color
 import android.graphics.Typeface
@@ -13,33 +15,35 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import java.util.Calendar
 
 class Mainscreen : AppCompatActivity() {
 
     private lateinit var resortsListContainer: LinearLayout
+    private lateinit var itineraryListContainer: LinearLayout
     private lateinit var searchEditText: EditText
-
+    private lateinit var tvMapOverlay: TextView
 
     private var selectedCategory: String = "All"
     private var searchQuery: String = ""
+    private var currentUserEmail: String = ""
 
-
-
-
+    // Complete list of resorts in Nasugbu, Batangas matching Resort class with GPS coordinates
     private val allResorts = listOf(
-        Resort("Bernabeach", "4.0/5", "Huts from Php 1,000", "Beachfront", listOf("All", "Budget", "WiFi")),
-        Resort("Calayo Beach Resort", "4.5/5", "Php 1,800/night", "Calayo Beach Area", listOf("All", "Budget", "Family", "WiFi")),
-        Resort("Sand Bar Beach Resort", "4.1/5", "Php 2,200/night", "Near Calayo Beach", listOf("All", "Budget", "WiFi")),
-        Resort("Pamana Resorts", "4.1/5", "Rooms from Php 5,900", "Beachfront", listOf("All", "Family", "Pool", "WiFi")),
-        Resort("Canyon Cove", "3.8/5", "Midrange (Php 3,800)", "White-sand Beachfront", listOf("All", "Pool", "Family", "Spa", "WiFi")),
-        Resort("Pico Sands Hotel", "4.4/5", "Premium (Php 6,500)", "Cove and Lagoon", listOf("All", "Pool", "Spa", "Family", "WiFi")),
-        Resort("Club Punta Fuego", "4.8/5", "Luxury (Php 7,200)", "Private Resort Beach", listOf("All", "Pool", "Spa", "WiFi")),
-        Resort("Shoreland", "3.7/5", "From Php 2,539/night", "Beachfront", listOf("All", "Budget", "WiFi")),
-        Resort("RSAM Beach Resort", "3.8/5", "About Php 4,750/night", "Beachfront", listOf("All", "Family", "WiFi")),
-        Resort("Pico de Loro", "4.4/5", "Access fees vary", "Cove and Lagoon", listOf("All", "Pool", "Spa", "Family"))
+        Resort(1, "Bernabeach", "Beachfront, Nasugbu", listOf("All", "Budget", "WiFi"), 4.0, "Huts from Php 1,000", 14.0682, 120.6271),
+        Resort(2, "Calayo Beach Resort", "Calayo Beach Area, Nasugbu", listOf("All", "Budget", "Family", "WiFi"), 4.5, "Php 1,800/night", 14.0722, 120.6288),
+        Resort(3, "Sand Bar Beach Resort", "Near Calayo Beach, Nasugbu", listOf("All", "Budget", "WiFi"), 4.1, "Php 2,200/night", 14.0750, 120.6295),
+        Resort(4, "Pamana Resorts", "Beachfront, Nasugbu", listOf("All", "Family", "Pool", "WiFi"), 4.1, "Rooms from Php 5,900", 14.0810, 120.6310),
+        Resort(5, "Canyon Cove", "White-sand Beachfront, Nasugbu", listOf("All", "Pool", "Family", "Spa", "WiFi"), 3.8, "Midrange (Php 3,800)", 14.0880, 120.6350),
+        Resort(6, "Pico Sands Hotel", "Cove and Lagoon, Nasugbu", listOf("All", "Pool", "Spa", "Family", "WiFi"), 4.4, "Premium (Php 6,500)", 14.1980, 120.6110),
+        Resort(7, "Club Punta Fuego", "Private Resort Beach, Nasugbu", listOf("All", "Pool", "Spa", "WiFi"), 4.8, "Luxury (Php 7,200)", 14.1283, 120.5847),
+        Resort(8, "Shoreland", "Beachfront, Nasugbu", listOf("All", "Budget", "WiFi"), 3.7, "From Php 2,539/night", 14.0620, 120.6250),
+        Resort(9, "RSAM Beach Resort", "Beachfront, Nasugbu", listOf("All", "Family", "WiFi"), 3.8, "About Php 4,750/night", 14.0650, 120.6260),
+        Resort(10, "Pico de Loro", "Cove and Lagoon, Nasugbu", listOf("All", "Pool", "Spa", "Family"), 4.4, "Access fees vary", 14.2003, 120.6121)
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -54,22 +58,100 @@ class Mainscreen : AppCompatActivity() {
             insets
         }
 
+        // Initialize Views
         resortsListContainer = findViewById(R.id.resorts_list_container)
+        itineraryListContainer = findViewById(R.id.itinerary_list_container)
         searchEditText = findViewById(R.id.search_edit_text)
+        tvMapOverlay = findViewById(R.id.tv_map_overlay)
 
-        val userEmail = intent.getStringExtra("USER_EMAIL")
+        // Set personalized greeting from Intent
+        currentUserEmail = intent.getStringExtra("USER_EMAIL") ?: "tourist@example.com"
         val greetingTitle = findViewById<TextView>(R.id.greeting_title)
-        if (!userEmail.isNullOrEmpty()) {
-            val name = userEmail.substringBefore("@")
+        if (currentUserEmail.isNotEmpty()) {
+            val name = currentUserEmail.substringBefore("@")
             greetingTitle.text = "Welcome, $name"
         }
 
+        // Fetch latest bookings from GitHub Cloud
+        GitHubCloudManager.fetchBookingsFromGitHub { _, _ ->
+            renderItinerary()
+        }
 
+        // Set up category buttons & search
         setupCategoryButtons()
         setupSearchListener()
+
+        // Render Active Itinerary and Resorts
+        renderItinerary()
         renderResorts()
+    }
 
+    private fun renderItinerary() {
+        itineraryListContainer.removeAllViews()
+        val userBookings = BookingManager.getTouristBookings(currentUserEmail)
 
+        if (userBookings.isEmpty()) {
+            val emptyTextView = TextView(this).apply {
+                text = "No active resort bookings yet. Explore resorts below to add to your itinerary."
+                setTextColor(Color.parseColor("#888888"))
+                textSize = 13f
+                setPadding(0, 10, 0, 10)
+            }
+            itineraryListContainer.addView(emptyTextView)
+            return
+        }
+
+        for (booking in userBookings) {
+            val bookingCard = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setBackgroundColor(Color.parseColor("#1E1E1E"))
+                setPadding(20, 20, 20, 20)
+                val params = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+                params.setMargins(0, 0, 0, 16)
+                layoutParams = params
+            }
+
+            val titleText = TextView(this).apply {
+                text = booking.resort.name
+                setTextColor(Color.WHITE)
+                textSize = 15f
+                typeface = Typeface.DEFAULT_BOLD
+            }
+
+            val datesText = TextView(this).apply {
+                text = "Dates: ${booking.checkInDate} to ${booking.checkOutDate} | Status: ${booking.status}"
+                setTextColor(Color.parseColor("#CCCCCC"))
+                textSize = 13f
+                setPadding(0, 4, 0, 8)
+            }
+
+            val btnCancel = Button(this).apply {
+                text = "Cancel Booking"
+                setTextColor(Color.RED)
+                textSize = 12f
+                setBackgroundColor(Color.TRANSPARENT)
+                setOnClickListener {
+                    BookingManager.cancelBooking(booking.bookingId)
+                    Toast.makeText(context, "Booking for ${booking.resort.name} cancelled.", Toast.LENGTH_SHORT).show()
+                    
+                    // Upload updated bookings to GitHub Cloud
+                    val token = CloudKeyManager.getDecryptedToken()
+                    if (token.isNotEmpty()) {
+                        GitHubCloudManager.uploadBookingsToGitHub(token) { _, _ -> }
+                    }
+                    
+                    renderItinerary()
+                }
+            }
+
+            bookingCard.addView(titleText)
+            bookingCard.addView(datesText)
+            bookingCard.addView(btnCancel)
+            itineraryListContainer.addView(bookingCard)
+        }
     }
 
     private fun setupCategoryButtons() {
@@ -92,7 +174,6 @@ class Mainscreen : AppCompatActivity() {
                 R.id.chip_budget -> "Budget"
                 else -> "All"
             }
-
 
             buttons.forEach { b ->
                 if (b.id == button.id) {
@@ -123,8 +204,8 @@ class Mainscreen : AppCompatActivity() {
         resortsListContainer.removeAllViews()
 
         val filteredList = allResorts.filter { resort ->
-            val matchesCategory = (selectedCategory == "All") || resort.categories.contains(selectedCategory)
-            val matchesSearch = searchQuery.isEmpty() || resort.name.contains(searchQuery, ignoreCase = true) || resort.beach.contains(searchQuery, ignoreCase = true)
+            val matchesCategory = (selectedCategory == "All") || resort.amenities.contains(selectedCategory)
+            val matchesSearch = searchQuery.isEmpty() || resort.name.contains(searchQuery, ignoreCase = true) || resort.location.contains(searchQuery, ignoreCase = true)
             matchesCategory && matchesSearch
         }
 
@@ -143,12 +224,140 @@ class Mainscreen : AppCompatActivity() {
             val resortCard = createResortView(resort)
             resortsListContainer.addView(resortCard)
         }
+
+        // Add Sync & Logout options at the bottom
+        val sessionLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, 40, 0, 40)
+        }
+
+        val btnSyncCloud = Button(this).apply {
+            text = "Sync Database to GitHub Cloud"
+            setTextColor(Color.parseColor("#45ED4D"))
+            setBackgroundColor(Color.TRANSPARENT)
+            setOnClickListener {
+                val token = CloudKeyManager.getDecryptedToken()
+                if (token.isNotEmpty()) {
+                    Toast.makeText(context, "Syncing to GitHub Cloud...", Toast.LENGTH_SHORT).show()
+                    GitHubCloudManager.uploadBookingsToGitHub(token) { _, msg ->
+                        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                    }
+                } else {
+                    Toast.makeText(context, "Base64 token not decrypted or missing in CloudKeyManager.kt", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+
+        val btnLogout = Button(this).apply {
+            text = "Log Out"
+            setTextColor(Color.RED)
+            setBackgroundColor(Color.TRANSPARENT)
+            setOnClickListener {
+                Toast.makeText(context, "Logged out successfully", Toast.LENGTH_SHORT).show()
+                val intent = Intent(context, MainActivity::class.java)
+                startActivity(intent)
+                finish()
+            }
+        }
+
+        sessionLayout.addView(btnSyncCloud)
+        sessionLayout.addView(btnLogout)
+        resortsListContainer.addView(sessionLayout)
+    }
+
+    private fun showBookingDateDialog(resort: Resort) {
+        val dialogView = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(40, 30, 40, 30)
+        }
+
+        val titleText = TextView(this).apply {
+            text = "Book ${resort.name}"
+            setTextColor(Color.WHITE)
+            textSize = 18f
+            typeface = Typeface.DEFAULT_BOLD
+        }
+
+        val checkInBtn = Button(this).apply {
+            text = "Select Check-In Date (e.g. 2026-03-01)"
+            setTextColor(Color.parseColor("#B388FF"))
+        }
+
+        val checkOutBtn = Button(this).apply {
+            text = "Select Check-Out Date (e.g. 2026-03-03)"
+            setTextColor(Color.parseColor("#B388FF"))
+        }
+
+        var checkInDateStr = "2026-03-01"
+        var checkOutDateStr = "2026-03-03"
+
+        checkInBtn.setOnClickListener {
+            val c = Calendar.getInstance()
+            DatePickerDialog(this, { _, year, month, day ->
+                checkInDateStr = String.format("%04d-%02d-%02d", year, month + 1, day)
+                checkInBtn.text = "Check-In: $checkInDateStr"
+            }, c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH)).show()
+        }
+
+        checkOutBtn.setOnClickListener {
+            val c = Calendar.getInstance()
+            DatePickerDialog(this, { _, year, month, day ->
+                checkOutDateStr = String.format("%04d-%02d-%02d", year, month + 1, day)
+                checkOutBtn.text = "Check-Out: $checkOutDateStr"
+            }, c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH)).show()
+        }
+
+        dialogView.addView(titleText)
+        dialogView.addView(checkInBtn)
+        dialogView.addView(checkOutBtn)
+
+        AlertDialog.Builder(this)
+            .setView(dialogView)
+            .setPositiveButton("Confirm Booking") { _, _ ->
+                val result = BookingManager.createBooking(
+                    touristEmail = currentUserEmail,
+                    resort = resort,
+                    checkInStr = checkInDateStr,
+                    checkOutStr = checkOutDateStr,
+                    paymentMethod = "Card"
+                )
+
+                when (result) {
+                    is BookingManager.BookingResult.Success -> {
+                        Toast.makeText(this, "Booking Confirmed for ${resort.name}!", Toast.LENGTH_LONG).show()
+                        
+                        // Upload booking immediately to GitHub Cloud
+                        val token = CloudKeyManager.getDecryptedToken()
+                        if (token.isNotEmpty()) {
+                            GitHubCloudManager.uploadBookingsToGitHub(token) { _, msg ->
+                                Toast.makeText(this, "Cloud Sync: $msg", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+
+                        renderItinerary() // Refresh My Active Itinerary
+                    }
+                    is BookingManager.BookingResult.Failure -> {
+                        AlertDialog.Builder(this)
+                            .setTitle("Booking Error")
+                            .setMessage(result.errorMessage)
+                            .setPositiveButton("OK", null)
+                            .show()
+                    }
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun createResortView(resort: Resort): View {
         val cardLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(0, 16, 0, 24)
+            setOnClickListener {
+                // Update GPS Map Coordinates on Map Container when Resort is Tapped
+                tvMapOverlay.text = "GPS Map: ${resort.name}\nLat: ${resort.latitude}° N, Lon: ${resort.longitude}° E"
+                Toast.makeText(context, "GPS Map centered on ${resort.name}", Toast.LENGTH_SHORT).show()
+            }
         }
 
         val nameTextView = TextView(this).apply {
@@ -159,18 +368,20 @@ class Mainscreen : AppCompatActivity() {
         }
 
         val detailsTextView = TextView(this).apply {
-            text = "Rating: ${resort.rating} | ${resort.price} | ${resort.beach}"
+            text = "Rating: ${resort.rating}/5 | ${resort.price}\nGPS: ${resort.getGpsCoordinates()}"
             setTextColor(Color.parseColor("#CCCCCC"))
             textSize = 13f
             setPadding(0, 4, 0, 8)
         }
 
         val addButton = Button(this).apply {
-            text = "Add to Itinerary"
+            text = "+ Add to Itinerary"
             setTextColor(Color.WHITE)
             textSize = 12f
             setOnClickListener {
-                Toast.makeText(context, "${resort.name} added to itinerary", Toast.LENGTH_SHORT).show()
+                // Update Map Container
+                tvMapOverlay.text = "GPS Map: ${resort.name}\nLat: ${resort.latitude}° N, Lon: ${resort.longitude}° E"
+                showBookingDateDialog(resort)
             }
         }
 

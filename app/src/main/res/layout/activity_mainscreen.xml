@@ -14,7 +14,6 @@
         android:layout_height="wrap_content"
         android:padding="20dp">
 
-
         <TextView
             android:id="@+id/greeting_title"
             android:layout_width="0dp"
@@ -40,7 +39,7 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@+id/greeting_title" />
 
-
+        <!-- GPS Map Container (~30% screen size) -->
         <FrameLayout
             android:id="@+id/map_container"
             android:layout_width="0dp"
@@ -60,24 +59,47 @@
                 tools:srcCompat="@tools:sample/backgrounds/scenic" />
 
             <TextView
+                android:id="@+id/tv_map_overlay"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="bottom|start"
                 android:layout_margin="12dp"
                 android:background="#80000000"
                 android:padding="6dp"
-                android:text="GPS Map: Nasugbu, Batangas"
+                android:text="GPS Map: Nasugbu, Batangas\nSelect a resort to view coordinates"
                 android:textColor="@color/white"
                 android:textSize="12sp" />
 
         </FrameLayout>
 
+        <!-- Active Itinerary Section -->
+        <TextView
+            android:id="@+id/itinerary_section_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="My Active Itinerary"
+            android:textColor="#B388FF"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/map_container" />
+
+        <LinearLayout
+            android:id="@+id/itinerary_list_container"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="vertical"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/itinerary_section_title" />
 
         <EditText
             android:id="@+id/search_edit_text"
             android:layout_width="0dp"
             android:layout_height="48dp"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="20dp"
             android:hint="Search resorts in Nasugbu..."
             android:inputType="text"
             android:paddingHorizontal="16dp"
@@ -86,8 +108,7 @@
             android:textSize="15sp"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/map_container" />
-
+            app:layout_constraintTop_toBottomOf="@+id/itinerary_list_container" />
 
         <HorizontalScrollView
             android:id="@+id/filter_scroll_view"
@@ -167,7 +188,6 @@
 
         </HorizontalScrollView>
 
-
         <TextView
             android:id="@+id/resorts_section_title"
             android:layout_width="wrap_content"
@@ -179,7 +199,6 @@
             android:textStyle="bold"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@+id/filter_scroll_view" />
-
 
         <LinearLayout
             android:id="@+id/resorts_list_container"

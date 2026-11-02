@@ -1,6 +1,6 @@
 package com.example.tdip
 
-// ResortAdmin inherits from Person
+// Model para sa resort admin na taga-approve at taga-manage ng guest bookings.
 class ResortAdmin(
     userId: Int,
     name: String,
