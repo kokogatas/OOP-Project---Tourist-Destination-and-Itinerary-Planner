@@ -28,5 +28,12 @@
     "email": "n@g.com",
     "password": "123",
     "role": "Customer"
+  },
+  {
+    "userId": 5,
+    "name": "ences",
+    "email": "ences@g.com",
+    "password": "1234",
+    "role": "Customer"
   }
 ]
