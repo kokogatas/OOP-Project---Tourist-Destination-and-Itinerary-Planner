@@ -14,13 +14,5 @@
     "checkInDate": "2026-11-13",
     "checkOutDate": "2026-11-16",
     "status": "Confirmed"
-  },
-  {
-    "bookingId": 103,
-    "resortId": 3,
-    "resortName": "Sand Bar Beach Resort",
-    "checkInDate": "2026-11-13",
-    "checkOutDate": "2026-11-16",
-    "status": "Confirmed"
   }
 ]
