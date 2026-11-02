@@ -1,1 +1,10 @@
-[]
+[
+  {
+    "bookingId": 100,
+    "resortId": 5,
+    "resortName": "Canyon Cove",
+    "checkInDate": "2026-11-10",
+    "checkOutDate": "2026-11-18",
+    "status": "Confirmed"
+  }
+]
