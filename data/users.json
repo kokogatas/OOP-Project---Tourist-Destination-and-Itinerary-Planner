@@ -13,20 +13,5 @@
     "password": "admin123",
     "role": "Admin",
     "resortName": "Canyon Cove Resort"
-  },
-  {
-    "userId": 3,
-    "name": "lemon",
-    "email": "l@g.com",
-    "password": "123",
-    "role": "Admin",
-    "resortName": "Canyon Cove"
-  },
-  {
-    "userId": 4,
-    "name": "ncezz",
-    "email": "n@g.com",
-    "password": "412",
-    "role": "Customer"
   }
 ]
