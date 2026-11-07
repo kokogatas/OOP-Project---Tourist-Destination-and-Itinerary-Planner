@@ -39,36 +39,46 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@+id/greeting_title" />
 
-        <!-- GPS Map Container (~30% screen size) -->
+        <!-- GPS Map Container (~30% screen size) with embedded Google Maps WebView -->
         <FrameLayout
             android:id="@+id/map_container"
             android:layout_width="0dp"
-            android:layout_height="200dp"
+            android:layout_height="220dp"
             android:layout_marginTop="16dp"
             android:background="#222222"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@+id/greeting_subtitle">
 
-            <ImageView
-                android:id="@+id/map_image"
+            <WebView
+                android:id="@+id/map_web_view"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:contentDescription="Nasugbu GPS Map"
-                android:scaleType="centerCrop"
-                tools:srcCompat="@tools:sample/backgrounds/scenic" />
+                android:layout_height="match_parent" />
 
             <TextView
                 android:id="@+id/tv_map_overlay"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_gravity="bottom|start"
-                android:layout_margin="12dp"
-                android:background="#80000000"
+                android:layout_gravity="top|start"
+                android:layout_margin="8dp"
+                android:background="#CC000000"
                 android:padding="6dp"
-                android:text="GPS Map: Nasugbu, Batangas\nSelect a resort to view coordinates"
+                android:text="GPS Map: Select a resort to pin on map"
                 android:textColor="@color/white"
-                android:textSize="12sp" />
+                android:textSize="11sp" />
+
+            <Button
+                android:id="@+id/btn_open_google_maps"
+                style="@style/Widget.AppCompat.Button.Borderless"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_gravity="bottom|end"
+                android:layout_margin="8dp"
+                android:background="#CC000000"
+                android:paddingHorizontal="8dp"
+                android:text="Open Google Maps App"
+                android:textColor="#B388FF"
+                android:textSize="10sp" />
 
         </FrameLayout>
 

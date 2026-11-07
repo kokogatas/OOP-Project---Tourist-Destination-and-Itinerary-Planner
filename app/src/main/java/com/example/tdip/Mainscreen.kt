@@ -5,10 +5,15 @@ import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.graphics.Color
 import android.graphics.Typeface
+import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -21,18 +26,22 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import java.util.Calendar
 
+// Mainscreen: Ang dashboard ng customer. Dito nakikita ang interactive Google Maps, resorts, at itinerary.
 class Mainscreen : AppCompatActivity() {
 
     private lateinit var resortsListContainer: LinearLayout
     private lateinit var itineraryListContainer: LinearLayout
     private lateinit var searchEditText: EditText
     private lateinit var tvMapOverlay: TextView
+    private lateinit var mapWebView: WebView
+    private lateinit var btnOpenGoogleMaps: Button
 
     private var selectedCategory: String = "All"
     private var searchQuery: String = ""
     private var currentUserEmail: String = ""
+    private var currentlySelectedResort: Resort? = null
 
-    // Complete list of resorts in Nasugbu, Batangas matching Resort class with GPS coordinates
+    // Complete list ng resorts sa Nasugbu, Batangas
     private val allResorts = listOf(
         Resort(1, "Bernabeach", "Beachfront, Nasugbu", listOf("All", "Budget", "WiFi"), 4.0, "Huts from Php 1,000", 14.0682, 120.6271),
         Resort(2, "Calayo Beach Resort", "Calayo Beach Area, Nasugbu", listOf("All", "Budget", "Family", "WiFi"), 4.5, "Php 1,800/night", 14.0722, 120.6288),
@@ -46,6 +55,17 @@ class Mainscreen : AppCompatActivity() {
         Resort(10, "Pico de Loro", "Cove and Lagoon, Nasugbu", listOf("All", "Pool", "Spa", "Family"), 4.4, "Access fees vary", 14.2003, 120.6121)
     )
 
+    private val refreshHandler = Handler(Looper.getMainLooper())
+    private val refreshRunnable = object : Runnable {
+        override fun run() {
+            // Live fetch sa Cloud bawat 1 segundo para updated status agad
+            SupabaseCloudManager.fetchBookingsFromSupabase { _, _ ->
+                renderItinerary()
+            }
+            refreshHandler.postDelayed(this, 1000)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
@@ -58,13 +78,17 @@ class Mainscreen : AppCompatActivity() {
             insets
         }
 
-        // Initialize Views
         resortsListContainer = findViewById(R.id.resorts_list_container)
         itineraryListContainer = findViewById(R.id.itinerary_list_container)
         searchEditText = findViewById(R.id.search_edit_text)
         tvMapOverlay = findViewById(R.id.tv_map_overlay)
+        mapWebView = findViewById(R.id.map_web_view)
+        btnOpenGoogleMaps = findViewById(R.id.btn_open_google_maps)
 
-        // Set personalized greeting from Intent
+        // Setup WebView for Google Maps
+        mapWebView.settings.javaScriptEnabled = true
+        mapWebView.webViewClient = WebViewClient()
+
         currentUserEmail = intent.getStringExtra("USER_EMAIL") ?: "tourist@example.com"
         val greetingTitle = findViewById<TextView>(R.id.greeting_title)
         if (currentUserEmail.isNotEmpty()) {
@@ -72,18 +96,44 @@ class Mainscreen : AppCompatActivity() {
             greetingTitle.text = "Welcome, $name"
         }
 
-        // Fetch latest bookings from GitHub Cloud
-        GitHubCloudManager.fetchBookingsFromGitHub { _, _ ->
-            renderItinerary()
+        // Default map view centered on Canyon Cove (resortId #5)
+        updateGpsMap(allResorts[4])
+
+        // Open in Google Maps app button listener
+        btnOpenGoogleMaps.setOnClickListener {
+            val targetResort = currentlySelectedResort ?: allResorts[4]
+            val geoUri = Uri.parse("geo:${targetResort.latitude},${targetResort.longitude}?q=${Uri.encode(targetResort.name)}")
+            val mapIntent = Intent(Intent.ACTION_VIEW, geoUri)
+            try {
+                startActivity(mapIntent)
+            } catch (e: Exception) {
+                Toast.makeText(this, "Opening GPS coordinates: ${targetResort.getGpsCoordinates()}", Toast.LENGTH_SHORT).show()
+            }
         }
 
-        // Set up category buttons & search
         setupCategoryButtons()
         setupSearchListener()
 
-        // Render Active Itinerary and Resorts
         renderItinerary()
         renderResorts()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        refreshHandler.post(refreshRunnable)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        refreshHandler.removeCallbacks(refreshRunnable)
+    }
+
+    // Updates the embedded Google Map WebView with exact resort GPS coordinates
+    private fun updateGpsMap(resort: Resort) {
+        currentlySelectedResort = resort
+        val embedMapUrl = "https://maps.google.com/maps?q=${resort.latitude},${resort.longitude}&z=15&output=embed"
+        mapWebView.loadUrl(embedMapUrl)
+        tvMapOverlay.text = "📍 ${resort.name}\nLat: ${resort.latitude}° N, Lon: ${resort.longitude}° E"
     }
 
     private fun renderItinerary() {
@@ -121,28 +171,29 @@ class Mainscreen : AppCompatActivity() {
                 typeface = Typeface.DEFAULT_BOLD
             }
 
+            val statusLower = booking.status.lowercase()
+            val (statusLabel, statusColor) = when {
+                statusLower.contains("confirm") -> "Approved (Confirmed)" to "#45ED4D" // Green
+                statusLower.contains("not") || statusLower.contains("reject") || statusLower.contains("cancel") -> "Status: Not Approved" to "#FF5252" // Red
+                else -> "Pending Approval" to "#FFB300" // Gold
+            }
+
             val datesText = TextView(this).apply {
-                text = "Dates: ${booking.checkInDate} to ${booking.checkOutDate} | Status: ${booking.status}"
-                setTextColor(Color.parseColor("#CCCCCC"))
+                text = "Dates: ${booking.checkInDate} to ${booking.checkOutDate}\n$statusLabel"
+                setTextColor(Color.parseColor(statusColor))
                 textSize = 13f
                 setPadding(0, 4, 0, 8)
             }
 
             val btnCancel = Button(this).apply {
-                text = "Cancel Booking"
+                text = "Cancel / Remove"
                 setTextColor(Color.RED)
                 textSize = 12f
                 setBackgroundColor(Color.TRANSPARENT)
                 setOnClickListener {
                     BookingManager.cancelBooking(booking.bookingId)
-                    Toast.makeText(context, "Booking for ${booking.resort.name} cancelled.", Toast.LENGTH_SHORT).show()
-                    
-                    // Upload updated bookings to GitHub Cloud
-                    val token = CloudKeyManager.getDecryptedToken()
-                    if (token.isNotEmpty()) {
-                        GitHubCloudManager.uploadBookingsToGitHub(token) { _, _ -> }
-                    }
-                    
+                    SupabaseCloudManager.deleteBookingFromSupabase(booking.bookingId) { _, _ -> }
+                    Toast.makeText(context, "Booking for ${booking.resort.name} removed.", Toast.LENGTH_SHORT).show()
                     renderItinerary()
                 }
             }
@@ -225,27 +276,9 @@ class Mainscreen : AppCompatActivity() {
             resortsListContainer.addView(resortCard)
         }
 
-        // Add Sync & Logout options at the bottom
         val sessionLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(0, 40, 0, 40)
-        }
-
-        val btnSyncCloud = Button(this).apply {
-            text = "Sync Database to GitHub Cloud"
-            setTextColor(Color.parseColor("#45ED4D"))
-            setBackgroundColor(Color.TRANSPARENT)
-            setOnClickListener {
-                val token = CloudKeyManager.getDecryptedToken()
-                if (token.isNotEmpty()) {
-                    Toast.makeText(context, "Syncing to GitHub Cloud...", Toast.LENGTH_SHORT).show()
-                    GitHubCloudManager.uploadBookingsToGitHub(token) { _, msg ->
-                        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
-                    }
-                } else {
-                    Toast.makeText(context, "Base64 token not decrypted or missing in CloudKeyManager.kt", Toast.LENGTH_LONG).show()
-                }
-            }
         }
 
         val btnLogout = Button(this).apply {
@@ -253,14 +286,13 @@ class Mainscreen : AppCompatActivity() {
             setTextColor(Color.RED)
             setBackgroundColor(Color.TRANSPARENT)
             setOnClickListener {
-                Toast.makeText(context, "Logged out successfully", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Logged out successfully!", Toast.LENGTH_SHORT).show()
                 val intent = Intent(context, MainActivity::class.java)
                 startActivity(intent)
                 finish()
             }
         }
 
-        sessionLayout.addView(btnSyncCloud)
         sessionLayout.addView(btnLogout)
         resortsListContainer.addView(sessionLayout)
     }
@@ -279,32 +311,44 @@ class Mainscreen : AppCompatActivity() {
         }
 
         val checkInBtn = Button(this).apply {
-            text = "Select Check-In Date (e.g. 2026-03-01)"
+            text = "Select Check-In Date"
             setTextColor(Color.parseColor("#B388FF"))
         }
 
         val checkOutBtn = Button(this).apply {
-            text = "Select Check-Out Date (e.g. 2026-03-03)"
+            text = "Select Check-Out Date"
             setTextColor(Color.parseColor("#B388FF"))
         }
 
-        var checkInDateStr = "2026-03-01"
-        var checkOutDateStr = "2026-03-03"
+        val cal = Calendar.getInstance()
+        val defaultYear = cal.get(Calendar.YEAR)
+        val defaultMonth = cal.get(Calendar.MONTH)
+        val defaultDay = cal.get(Calendar.DAY_OF_MONTH)
+
+        val checkInDefault = String.format("%04d-%02d-%02d", defaultYear, defaultMonth + 1, defaultDay)
+        cal.add(Calendar.DAY_OF_YEAR, 1)
+        val checkOutDefault = String.format("%04d-%02d-%02d", cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH))
+
+        var checkInDateStr = checkInDefault
+        var checkOutDateStr = checkOutDefault
+
+        checkInBtn.text = "Check-In: $checkInDateStr"
+        checkOutBtn.text = "Check-Out: $checkOutDateStr"
 
         checkInBtn.setOnClickListener {
-            val c = Calendar.getInstance()
+            val pickerCal = Calendar.getInstance()
             DatePickerDialog(this, { _, year, month, day ->
                 checkInDateStr = String.format("%04d-%02d-%02d", year, month + 1, day)
                 checkInBtn.text = "Check-In: $checkInDateStr"
-            }, c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH)).show()
+            }, pickerCal.get(Calendar.YEAR), pickerCal.get(Calendar.MONTH), pickerCal.get(Calendar.DAY_OF_MONTH)).show()
         }
 
         checkOutBtn.setOnClickListener {
-            val c = Calendar.getInstance()
+            val pickerCal = Calendar.getInstance()
             DatePickerDialog(this, { _, year, month, day ->
                 checkOutDateStr = String.format("%04d-%02d-%02d", year, month + 1, day)
                 checkOutBtn.text = "Check-Out: $checkOutDateStr"
-            }, c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH)).show()
+            }, pickerCal.get(Calendar.YEAR), pickerCal.get(Calendar.MONTH), pickerCal.get(Calendar.DAY_OF_MONTH)).show()
         }
 
         dialogView.addView(titleText)
@@ -324,24 +368,14 @@ class Mainscreen : AppCompatActivity() {
 
                 when (result) {
                     is BookingManager.BookingResult.Success -> {
-                        Toast.makeText(this, "Booking Confirmed for ${resort.name}!", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this, "Booking submitted for ${resort.name}!", Toast.LENGTH_LONG).show()
                         
-                        // Upload booking immediately to GitHub Cloud
-                        val token = CloudKeyManager.getDecryptedToken()
-                        if (token.isNotEmpty()) {
-                            GitHubCloudManager.uploadBookingsToGitHub(token) { _, msg ->
-                                Toast.makeText(this, "Cloud Sync: $msg", Toast.LENGTH_SHORT).show()
-                            }
-                        }
+                        SupabaseCloudManager.uploadBookingToSupabase(result.booking) { _, _ -> }
 
-                        renderItinerary() // Refresh My Active Itinerary
+                        renderItinerary()
                     }
                     is BookingManager.BookingResult.Failure -> {
-                        AlertDialog.Builder(this)
-                            .setTitle("Booking Error")
-                            .setMessage(result.errorMessage)
-                            .setPositiveButton("OK", null)
-                            .show()
+                        DialogUtils.showFullErrorDialog(this, "Booking Error", result.errorMessage)
                     }
                 }
             }
@@ -354,8 +388,7 @@ class Mainscreen : AppCompatActivity() {
             orientation = LinearLayout.VERTICAL
             setPadding(0, 16, 0, 24)
             setOnClickListener {
-                // Update GPS Map Coordinates on Map Container when Resort is Tapped
-                tvMapOverlay.text = "GPS Map: ${resort.name}\nLat: ${resort.latitude}° N, Lon: ${resort.longitude}° E"
+                updateGpsMap(resort)
                 Toast.makeText(context, "GPS Map centered on ${resort.name}", Toast.LENGTH_SHORT).show()
             }
         }
@@ -379,8 +412,7 @@ class Mainscreen : AppCompatActivity() {
             setTextColor(Color.WHITE)
             textSize = 12f
             setOnClickListener {
-                // Update Map Container
-                tvMapOverlay.text = "GPS Map: ${resort.name}\nLat: ${resort.latitude}° N, Lon: ${resort.longitude}° E"
+                updateGpsMap(resort)
                 showBookingDateDialog(resort)
             }
         }

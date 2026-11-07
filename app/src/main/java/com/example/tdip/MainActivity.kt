@@ -12,6 +12,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 
+// MainActivity: Ang pinto ng app. Dito nagse-select ng role at naglo-log in.
 class MainActivity : AppCompatActivity() {
 
     private var selectedRole: String = "Customer"
@@ -29,9 +30,9 @@ class MainActivity : AppCompatActivity() {
             insets
         }
 
-        // Silent pre-fetch from GitHub Cloud on launch
+        // Sy-sync muna ang user accounts mula sa Cloud agad
         if (NetworkUtils.isInternetAvailable(this)) {
-            GitHubCloudManager.fetchUsersFromGitHub { _, _ -> }
+            SupabaseCloudManager.fetchUsersFromSupabase { _, _ -> }
         }
 
         val btnRoleCustomer = findViewById<Button>(R.id.btn_role_customer)
@@ -42,7 +43,7 @@ class MainActivity : AppCompatActivity() {
         val emailInput = findViewById<EditText>(R.id.editTextTextEmailAddress)
         val passwordInput = findViewById<EditText>(R.id.editTextTextPassword)
 
-        // Role Selector Buttons
+        // Select Role Buttons
         btnRoleCustomer.setOnClickListener {
             selectedRole = "Customer"
             btnRoleCustomer.setTextColor(Color.parseColor("#B388FF"))
@@ -55,7 +56,7 @@ class MainActivity : AppCompatActivity() {
             btnRoleCustomer.setTextColor(Color.parseColor("#CCCCCC"))
         }
 
-        // Registration Button
+        // Navigate to Registration Screen
         registerButton.setOnClickListener {
             val intent = Intent(this, RegisterActivity::class.java)
             startActivity(intent)
@@ -71,38 +72,48 @@ class MainActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            // Step 1: Show "Connecting to Cloud..." message immediately
-            Toast.makeText(this, "Connecting to Cloud...", Toast.LENGTH_SHORT).show()
+            // Authenticate directly from local database first
+            var user = UserManager.login(emailOrName, password, selectedRole)
 
-            // Step 2: Attempt connection to GitHub Cloud API
-            GitHubCloudManager.fetchUsersFromGitHub { success, msg ->
-                if (!success) {
-                    // Step 3: If no reply or no internet connection, show error message
-                    Toast.makeText(this, "No internet connection or cloud server did not reply. Please check your network.", Toast.LENGTH_LONG).show()
+            if (user != null) {
+                Toast.makeText(this, "Welcome back, ${user.name}!", Toast.LENGTH_SHORT).show()
+                proceedToDashboard(user)
+                return@setOnClickListener
+            }
+
+            if (!NetworkUtils.isInternetAvailable(this)) {
+                Toast.makeText(this, "Offline: Account not found for $selectedRole.", Toast.LENGTH_LONG).show()
+                return@setOnClickListener
+            }
+
+            Toast.makeText(this, "Logging in...", Toast.LENGTH_SHORT).show()
+
+            // Fetch latest user database from Supabase immediately, then authenticate
+            SupabaseCloudManager.fetchUsersFromSupabase { _, _ ->
+                user = UserManager.login(emailOrName, password, selectedRole)
+
+                if (user != null) {
+                    Toast.makeText(this, "Welcome back, ${user!!.name}!", Toast.LENGTH_SHORT).show()
+                    proceedToDashboard(user!!)
                 } else {
-                    // Step 4: If reply received from Cloud, proceed to verify credentials
-                    val user = UserManager.login(emailOrName, password, selectedRole)
-
-                    if (user != null) {
-                        Toast.makeText(this, "Welcome back, ${user.name}!", Toast.LENGTH_SHORT).show()
-
-                        if (user is ResortAdmin) {
-                            val intent = Intent(this, AdminScreen::class.java)
-                            intent.putExtra("ADMIN_NAME", user.name)
-                            intent.putExtra("RESORT_NAME", user.resortName)
-                            startActivity(intent)
-                            finish()
-                        } else if (user is Tourist) {
-                            val intent = Intent(this, Mainscreen::class.java)
-                            intent.putExtra("USER_EMAIL", user.email)
-                            startActivity(intent)
-                            finish()
-                        }
-                    } else {
-                        Toast.makeText(this, "Invalid credentials or user not found for $selectedRole!", Toast.LENGTH_LONG).show()
-                    }
+                    Toast.makeText(this, "Invalid credentials or user not found for $selectedRole!", Toast.LENGTH_LONG).show()
                 }
             }
+        }
+    }
+
+    private fun proceedToDashboard(user: Person) {
+        if (user is ResortAdmin) {
+            val intent = Intent(this, AdminScreen::class.java)
+            intent.putExtra("ADMIN_NAME", user.name)
+            intent.putExtra("RESORT_NAME", user.resortName)
+            startActivity(intent)
+            finish()
+        } else if (user is Tourist) {
+            val intent = Intent(this, Mainscreen::class.java)
+            intent.putExtra("USER_EMAIL", user.email)
+            startActivity(intent)
+            finish()
         }
     }
 }
