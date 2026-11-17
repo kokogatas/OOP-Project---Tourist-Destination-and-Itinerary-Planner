@@ -4,10 +4,13 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 
-// NetworkUtils: Tagachik kung may signal o internet ka ba o nag-aasam ka lang mag-cloud sync.
 object NetworkUtils {
 
+    // for dev purposes, bypass switch
+    var bypassInternet: Boolean = true
+
     fun isInternetAvailable(context: Context): Boolean {
+        if (bypassInternet) return true
         val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val network = connectivityManager.activeNetwork ?: return false
         val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false

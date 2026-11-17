@@ -15,7 +15,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 
-// RegisterActivity: Dito gumagawa ng bagong account para sa Customer o Resort Admin.
 class RegisterActivity : AppCompatActivity() {
 
     private var selectedRole: String = "Customer"
@@ -60,7 +59,6 @@ class RegisterActivity : AppCompatActivity() {
         val btnRegister = findViewById<Button>(R.id.btn_register)
         val btnBackToLogin = findViewById<Button>(R.id.btn_back_to_login)
 
-        // Role Toggle
         btnRoleCustomer.setOnClickListener {
             selectedRole = "Customer"
             btnRoleCustomer.setTextColor(Color.parseColor("#B388FF"))
@@ -89,22 +87,21 @@ class RegisterActivity : AppCompatActivity() {
             }
 
             val registeredUser: Person = if (selectedRole == "Admin") {
-                UserManager.registerAdmin(name, email, password, chosenResort)
+                ResortAdmin((1000..9999).random(), name, email, password, chosenResort)
             } else {
-                UserManager.registerTourist(name, email, password)
+                Tourist((1000..9999).random(), name, email, password)
             }
 
-            // Sync user to Supabase Cloud and display full readable message
-            Toast.makeText(this, "Uploading user to Cloud...", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Uploading user to Database...", Toast.LENGTH_SHORT).show()
             SupabaseCloudManager.uploadUserToSupabase(registeredUser) { success, msg ->
                 if (success) {
-                    Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "Registered and saved to Database!", Toast.LENGTH_SHORT).show()
                     finish()
                 } else {
                     DialogUtils.showFullErrorDialog(
                         this,
-                        "Cloud Registration Response",
-                        "Account registered in local memory.\n\nCloud Status:\n$msg"
+                        "Database Registration Response",
+                        "Status:\n$msg"
                     )
                 }
             }

@@ -1,19 +1,23 @@
 package com.example.tdip
 
+import android.Manifest
 import android.app.DatePickerDialog
 import android.content.Intent
 import android.content.pm.ActivityInfo
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Typeface
+import android.location.Location
+import android.location.LocationManager
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.text.Editable
+import android.text.Html
+import android.text.InputType
 import android.text.TextWatcher
 import android.view.View
-import android.webkit.WebView
-import android.webkit.WebViewClient
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -22,18 +26,27 @@ import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import org.maplibre.android.annotations.MarkerOptions
+import org.maplibre.android.camera.CameraPosition
+import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.maps.MapView
+import org.maplibre.android.maps.Style
 import java.util.Calendar
 
-// Mainscreen: Ang dashboard ng customer. Dito nakikita ang interactive Google Maps, resorts, at itinerary.
 class Mainscreen : AppCompatActivity() {
 
     private lateinit var resortsListContainer: LinearLayout
     private lateinit var itineraryListContainer: LinearLayout
     private lateinit var searchEditText: EditText
     private lateinit var tvMapOverlay: TextView
-    private lateinit var mapWebView: WebView
+    private lateinit var mapLibreView: MapView
     private lateinit var btnOpenGoogleMaps: Button
 
     private var selectedCategory: String = "All"
@@ -41,24 +54,38 @@ class Mainscreen : AppCompatActivity() {
     private var currentUserEmail: String = ""
     private var currentlySelectedResort: Resort? = null
 
-    // Complete list ng resorts sa Nasugbu, Batangas
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
+    private var userLocation: Location? = null
+
     private val allResorts = listOf(
-        Resort(1, "Bernabeach", "Beachfront, Nasugbu", listOf("All", "Budget", "WiFi"), 4.0, "Huts from Php 1,000", 14.0682, 120.6271),
-        Resort(2, "Calayo Beach Resort", "Calayo Beach Area, Nasugbu", listOf("All", "Budget", "Family", "WiFi"), 4.5, "Php 1,800/night", 14.0722, 120.6288),
-        Resort(3, "Sand Bar Beach Resort", "Near Calayo Beach, Nasugbu", listOf("All", "Budget", "WiFi"), 4.1, "Php 2,200/night", 14.0750, 120.6295),
-        Resort(4, "Pamana Resorts", "Beachfront, Nasugbu", listOf("All", "Family", "Pool", "WiFi"), 4.1, "Rooms from Php 5,900", 14.0810, 120.6310),
-        Resort(5, "Canyon Cove", "White-sand Beachfront, Nasugbu", listOf("All", "Pool", "Family", "Spa", "WiFi"), 3.8, "Midrange (Php 3,800)", 14.0880, 120.6350),
-        Resort(6, "Pico Sands Hotel", "Cove and Lagoon, Nasugbu", listOf("All", "Pool", "Spa", "Family", "WiFi"), 4.4, "Premium (Php 6,500)", 14.1980, 120.6110),
-        Resort(7, "Club Punta Fuego", "Private Resort Beach, Nasugbu", listOf("All", "Pool", "Spa", "WiFi"), 4.8, "Luxury (Php 7,200)", 14.1283, 120.5847),
-        Resort(8, "Shoreland", "Beachfront, Nasugbu", listOf("All", "Budget", "WiFi"), 3.7, "From Php 2,539/night", 14.0620, 120.6250),
-        Resort(9, "RSAM Beach Resort", "Beachfront, Nasugbu", listOf("All", "Family", "WiFi"), 3.8, "About Php 4,750/night", 14.0650, 120.6260),
-        Resort(10, "Pico de Loro", "Cove and Lagoon, Nasugbu", listOf("All", "Pool", "Spa", "Family"), 4.4, "Access fees vary", 14.2003, 120.6121)
+        Resort(1, "Berna Beach Resort", "Beachfront, Nasugbu", listOf("All", "Budget", "WiFi", "Pool"), 4.0, "Php 1,500/night", 14.0687293198155, 120.62560921173868, true, "2:00 PM", "12:00 NN", "6:00 AM – 5:00 PM", "10:00 AM – 8:30 PM"),
+        Resort(2, "Calayo Beach Resort", "Calayo Beach Area, Nasugbu", listOf("All", "Budget", "Family", "WiFi"), 4.5, "Php 1,800/night", 14.146119552634666, 120.61212663872902, true, "2:00 PM", "12:00 PM", "N/A", "7:30 AM – 5:00 PM (Pool: 7:30 AM – 11:00 PM)"),
+        Resort(3, "Sand Bar Beach Resort", "Near Calayo Beach, Nasugbu", listOf("All", "Budget", "WiFi"), 4.1, "Php 2,200/night", 14.151478147970018, 120.60977798475078, true, "2:00 PM", "12:00 PM", "N/A", "Latest Check-in: 8:00 PM"),
+        Resort(4, "Pamana Resorts and Hotels", "Beachfront, Nasugbu", listOf("All", "Family", "WiFi"), 4.1, "Php 5,900/night", 14.152455482419331, 120.60930996556769, true, "2:00 PM", "12:00 PM", "N/A", "Latest Check-in: 8:00 PM"),
+        Resort(5, "Canyon Cove Hotel & Spa", "White-sand Beachfront, Nasugbu", listOf("All", "Pool", "Family", "Spa", "WiFi"), 3.8, "Php 3,800/night", 14.092536522979145, 120.62173702154001, true, "3:00 PM", "11:00 AM", "7:00 AM – 8:00 PM", "24/7 Front Desk"),
+        Resort(6, "Pico Sands Hotel", "Cove and Lagoon, Nasugbu", listOf("All", "Pool", "Spa", "Family", "WiFi"), 4.4, "Php 6,500/night", 14.192116211144523, 120.60208803872919, true, "2:00 PM", "11:00 AM", "N/A", "24/7 Front Desk"),
+        Resort(7, "Club Punta Fuego", "Private Resort Beach, Nasugbu", listOf("All", "Pool", "Spa", "WiFi"), 4.8, "Php 7,200/night", 14.133503675842242, 120.57975121173968, true, "2:00 PM", "12:00 PM", "N/A", "Standard Front Desk"),
+        Resort(8, "Shoreland Beach Resort powered by Cocotel", "Beachfront, Nasugbu", listOf("All", "Budget", "WiFi", "Pool"), 3.7, "Php 2,539/night", 14.06999023964827, 120.62567936756317, true, "2:00 PM", "12:00 PM", "N/A", "Latest Check-in: 9:00 PM"),
+        Resort(9, "RSAM Beach Resort by Cocotel", "Beachfront, Nasugbu", listOf("All", "Family", "WiFi"), 3.8, "Php 4,750/night", 14.15077504858209, 120.60990193688187, true, "2:00 PM", "12:00 PM", "N/A", "Standard Front Desk"),
+        Resort(10, "Pico De Loro Beach", "Cove and Lagoon, Nasugbu", listOf("All", "Pool", "Spa", "Family"), 4.4, "Php 5,500/night", 14.189976914403214, 120.59706429639938, true, "2:00 PM", "12:00 PM", "6:00 AM – 6:00 PM", "Private Members Club")
+    )
+
+    private val resortAmenitiesMap = mapOf(
+        1 to listOf("Swimming Pool", "Beachfront", "Non-Smoking Rooms", "Air Conditioning", "Free Internet", "Free Self-Parking", "Room Service"),
+        2 to listOf("Wheelchair Accessible", "Parking", "Paid Private Parking On-Site", "Street Parking", "Free Self-Parking", "Pets Welcome", "Free Wi-Fi", "Air Conditioning"),
+        3 to listOf("Pets Welcome", "Beachfront", "Air Conditioning", "Free Internet", "Free Self-Parking", "Parking Garage", "Room Service", "Housekeeping"),
+        4 to listOf("Parking", "Accessible Parking", "Paid Private Parking On-Site", "Free Self-Parking", "Free Wi-Fi", "Air Conditioning", "Smoking-Free"),
+        5 to listOf("Wheelchair Accessible", "Swimming Pool", "Spa", "Free Wi-Fi", "Beachfront", "Mountain View", "Non-Smoking Rooms", "Air Conditioning", "Meeting Rooms", "Parking", "Paid Private Parking On-Site", "Free Self-Parking", "24-Hour Front Desk", "Concierge", "Free Breakfast", "Room Service", "Housekeeping", "Laundry Service", "Suites", "Balcony", "Coffee and Tea Makers", "Clothes Iron", "Hair Dryers", "Accepts Credit Cards"),
+        6 to listOf("Swimming Pool", "Fitness Center", "Spa", "Free Wi-Fi", "Mountain View", "Non-Smoking Rooms", "Air Conditioning", "Meeting Rooms", "Parking", "Paid Private Parking On-Site", "Valet Parking", "Free Self-Parking", "24-Hour Front Desk", "Concierge", "Shuttle Bus", "Free Breakfast", "Room Service", "Dry-Cleaning", "Laundry Service", "Balcony", "Minibars", "Tennis Court"),
+        7 to listOf("Swimming Pool", "Fitness Center", "Spa", "Free Wi-Fi", "Beachfront", "Non-Smoking Rooms", "Air Conditioning", "Business Center", "Meeting Rooms", "Parking", "Accessible Parking", "Paid Private Parking On-Site", "Free Self-Parking", "24-Hour Front Desk", "Concierge", "Shuttle Bus", "Free Breakfast", "Room Service", "Laundry Service", "Room Safes", "Suites", "Balcony", "Refrigerator", "Minibars", "Televisions", "Golf Course", "Tennis Court", "Private Beach"),
+        8 to listOf("Swimming Pool", "Pets Welcome", "Free Wi-Fi", "Non-Smoking Rooms", "Air Conditioning", "Parking", "Paid Private Parking On-Site", "Free Self-Parking"),
+        9 to listOf("Parking", "Accessible Parking", "Paid Private Parking On-Site", "Free Self-Parking", "Parking Garage", "Pets Welcome", "Free Wi-Fi", "Smoking-Free"),
+        10 to listOf("Swimming Pool", "Beachfront", "Free Wi-Fi", "Air Conditioning", "Parking", "Spa", "Fitness Center")
     )
 
     private val refreshHandler = Handler(Looper.getMainLooper())
     private val refreshRunnable = object : Runnable {
         override fun run() {
-            // Live fetch sa Cloud bawat 1 segundo para updated status agad
             SupabaseCloudManager.fetchBookingsFromSupabase { _, _ ->
                 renderItinerary()
             }
@@ -78,16 +105,22 @@ class Mainscreen : AppCompatActivity() {
             insets
         }
 
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+
         resortsListContainer = findViewById(R.id.resorts_list_container)
         itineraryListContainer = findViewById(R.id.itinerary_list_container)
         searchEditText = findViewById(R.id.search_edit_text)
         tvMapOverlay = findViewById(R.id.tv_map_overlay)
-        mapWebView = findViewById(R.id.map_web_view)
+        mapLibreView = findViewById(R.id.mapView)
         btnOpenGoogleMaps = findViewById(R.id.btn_open_google_maps)
 
-        // Setup WebView for Google Maps
-        mapWebView.settings.javaScriptEnabled = true
-        mapWebView.webViewClient = WebViewClient()
+        mapLibreView.onCreate(savedInstanceState)
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION), 100)
+        }
+
+        fetchUserGpsLocationAndInitializeMap()
 
         currentUserEmail = intent.getStringExtra("USER_EMAIL") ?: "tourist@example.com"
         val greetingTitle = findViewById<TextView>(R.id.greeting_title)
@@ -96,12 +129,8 @@ class Mainscreen : AppCompatActivity() {
             greetingTitle.text = "Welcome, $name"
         }
 
-        // Default map view centered on Canyon Cove (resortId #5)
-        updateGpsMap(allResorts[4])
-
-        // Open in Google Maps app button listener
         btnOpenGoogleMaps.setOnClickListener {
-            val targetResort = currentlySelectedResort ?: allResorts[4]
+            val targetResort = currentlySelectedResort ?: allResorts[0]
             val geoUri = Uri.parse("geo:${targetResort.latitude},${targetResort.longitude}?q=${Uri.encode(targetResort.name)}")
             val mapIntent = Intent(Intent.ACTION_VIEW, geoUri)
             try {
@@ -118,22 +147,110 @@ class Mainscreen : AppCompatActivity() {
         renderResorts()
     }
 
-    override fun onResume() {
-        super.onResume()
-        refreshHandler.post(refreshRunnable)
+    private fun fetchUserGpsLocationAndInitializeMap() {
+        val locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
+        val isGpsOn = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) || locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+
+        if (!isGpsOn) {
+            Toast.makeText(this, "GPS is OFF. Distance cannot be calculated.", Toast.LENGTH_LONG).show()
+            initializeMapWithResorts(null)
+            return
+        }
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null).addOnSuccessListener { loc ->
+                if (loc != null) {
+                    userLocation = loc
+                } else {
+                    val fallbackLoc = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+                        ?: locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+                    if (fallbackLoc != null) {
+                        userLocation = fallbackLoc
+                    }
+                }
+                initializeMapWithResorts(userLocation)
+            }.addOnFailureListener {
+                initializeMapWithResorts(null)
+            }
+        } else {
+            initializeMapWithResorts(null)
+        }
     }
 
-    override fun onPause() {
-        super.onPause()
-        refreshHandler.removeCallbacks(refreshRunnable)
+    private fun initializeMapWithResorts(userLoc: Location?) {
+        mapLibreView.getMapAsync { map ->
+            map.setStyle(Style.Builder().fromUri("https://styles.maptoolkit.org/summer.json")) { _ ->
+                val nasugbuCenter = LatLng(14.07, 120.63)
+                val cameraPosition = CameraPosition.Builder()
+                    .target(nasugbuCenter)
+                    .zoom(12.0)
+                    .build()
+                map.cameraPosition = cameraPosition
+
+                if (userLoc != null) {
+                    map.addMarker(MarkerOptions().position(LatLng(userLoc.latitude, userLoc.longitude)).title("📍 Your GPS Location"))
+                }
+
+                for (resort in allResorts) {
+                    map.addMarker(MarkerOptions().position(LatLng(resort.latitude, resort.longitude)).title("📍 ${resort.name}"))
+                }
+            }
+        }
+        updateGpsMap(allResorts[0])
     }
 
-    // Updates the embedded Google Map WebView with exact resort GPS coordinates
+    override fun onStart() { super.onStart(); mapLibreView.onStart() }
+    override fun onResume() { super.onResume(); mapLibreView.onResume(); refreshHandler.post(refreshRunnable) }
+    override fun onPause() { super.onPause(); mapLibreView.onPause(); refreshHandler.removeCallbacks(refreshRunnable) }
+    override fun onStop() { super.onStop(); mapLibreView.onStop() }
+    override fun onDestroy() { super.onDestroy(); mapLibreView.onDestroy() }
+    override fun onSaveInstanceState(outState: Bundle) { super.onSaveInstanceState(outState); mapLibreView.onSaveInstanceState(outState) }
+    override fun onLowMemory() { super.onLowMemory(); mapLibreView.onLowMemory() }
+
     private fun updateGpsMap(resort: Resort) {
         currentlySelectedResort = resort
-        val embedMapUrl = "https://maps.google.com/maps?q=${resort.latitude},${resort.longitude}&z=15&output=embed"
-        mapWebView.loadUrl(embedMapUrl)
-        tvMapOverlay.text = "📍 ${resort.name}\nLat: ${resort.latitude}° N, Lon: ${resort.longitude}° E"
+
+        mapLibreView.getMapAsync { map ->
+            map.setStyle(Style.Builder().fromUri("https://styles.maptoolkit.org/summer.json")) { _ ->
+                map.removeAnnotations()
+
+                val resortPoint = LatLng(resort.latitude, resort.longitude)
+                map.addMarker(MarkerOptions().position(resortPoint).title("📍 ${resort.name}"))
+
+                if (userLocation != null) {
+                    val userPoint = LatLng(userLocation!!.latitude, userLocation!!.longitude)
+                    map.addMarker(MarkerOptions().position(userPoint).title("📍 Your GPS Location"))
+                }
+
+                val cameraPosition = CameraPosition.Builder()
+                    .target(resortPoint)
+                    .zoom(14.0)
+                    .build()
+                map.cameraPosition = cameraPosition
+            }
+        }
+
+        var distanceText = ""
+        val locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
+        val isGpsOn = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) || locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+
+        if (!isGpsOn) {
+            distanceText = "<br><font color='#FF5252'><b>GPS is OFF. Distance cannot be calculated.</b></font>"
+        } else if (userLocation != null) {
+            val results = FloatArray(1)
+            Location.distanceBetween(userLocation!!.latitude, userLocation!!.longitude, resort.latitude, resort.longitude, results)
+            val meters = results[0]
+            val km = meters / 1000.0
+            val miles = km * 0.621371
+            distanceText = "<br><b>User GPS:</b> %.4f° N, %.4f° E<br><b>Distance:</b> <font color='#45ED4D'><b>%.2f km (%.2f miles)</b></font>".format(userLocation!!.latitude, userLocation!!.longitude, km, miles)
+        } else {
+            distanceText = "<br><font color='#FFB300'><b>Fetching GPS location...</b></font>"
+        }
+
+        val overlayHtml = "<b>📍 <font color='#B388FF'>${resort.name}</font></b> (ID #${resort.resortId})<br>Resort GPS: ${resort.latitude}° N, ${resort.longitude}° E$distanceText"
+        tvMapOverlay.text = Html.fromHtml(overlayHtml, Html.FROM_HTML_MODE_COMPACT)
+        tvMapOverlay.textSize = 12.0f
+        tvMapOverlay.setTextColor(Color.WHITE)
     }
 
     private fun renderItinerary() {
@@ -167,21 +284,25 @@ class Mainscreen : AppCompatActivity() {
             val titleText = TextView(this).apply {
                 text = booking.resort.name
                 setTextColor(Color.WHITE)
-                textSize = 15f
+                textSize = 16f
                 typeface = Typeface.DEFAULT_BOLD
             }
 
             val statusLower = booking.status.lowercase()
             val (statusLabel, statusColor) = when {
-                statusLower.contains("confirm") -> "Approved (Confirmed)" to "#45ED4D" // Green
-                statusLower.contains("not") || statusLower.contains("reject") || statusLower.contains("cancel") -> "Status: Not Approved" to "#FF5252" // Red
-                else -> "Pending Approval" to "#FFB300" // Gold
+                statusLower.contains("confirm") -> "Approved (Confirmed)" to "#45ED4D"
+                statusLower.contains("not") || statusLower.contains("reject") || statusLower.contains("cancel") -> "Status: Not Approved" to "#FF5252"
+                else -> "Pending Approval" to "#FFB300"
             }
 
+            val baseNum = booking.resort.price.replace(Regex("[^0-9.]"), "").toDoubleOrNull() ?: 3500.0
+            val approxTotal = baseNum * 2
+
             val datesText = TextView(this).apply {
-                text = "Dates: ${booking.checkInDate} to ${booking.checkOutDate}\n$statusLabel"
+                text = "Dates: ${booking.checkInDate} to ${booking.checkOutDate}\n$statusLabel\nApprox. Total: Php %,.2f".format(approxTotal)
                 setTextColor(Color.parseColor(statusColor))
-                textSize = 13f
+                textSize = 14f
+                setTypeface(null, Typeface.BOLD)
                 setPadding(0, 4, 0, 8)
             }
 
@@ -246,9 +367,28 @@ class Mainscreen : AppCompatActivity() {
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
                 searchQuery = s.toString().trim()
                 renderResorts()
+                filterMapMarkers(searchQuery)
             }
             override fun afterTextChanged(s: Editable?) {}
         })
+    }
+
+    private fun filterMapMarkers(query: String) {
+        mapLibreView.getMapAsync { map ->
+            map.setStyle(Style.Builder().fromUri("https://styles.maptoolkit.org/summer.json")) { _ ->
+                map.removeAnnotations()
+                if (userLocation != null) {
+                    map.addMarker(MarkerOptions().position(LatLng(userLocation!!.latitude, userLocation!!.longitude)).title("📍 Your GPS Location"))
+                }
+                val filtered = allResorts.filter { query.isEmpty() || it.name.contains(query, true) || it.location.contains(query, true) }
+                for (resort in filtered) {
+                    map.addMarker(MarkerOptions().position(LatLng(resort.latitude, resort.longitude)).title("📍 ${resort.name}"))
+                }
+                if (filtered.isNotEmpty()) {
+                    updateGpsMap(filtered[0])
+                }
+            }
+        }
     }
 
     private fun renderResorts() {
@@ -307,7 +447,7 @@ class Mainscreen : AppCompatActivity() {
             text = "Book ${resort.name}"
             setTextColor(Color.WHITE)
             textSize = 18f
-            typeface = Typeface.DEFAULT_BOLD
+            setTypeface(null, Typeface.BOLD)
         }
 
         val checkInBtn = Button(this).apply {
@@ -318,6 +458,45 @@ class Mainscreen : AppCompatActivity() {
         val checkOutBtn = Button(this).apply {
             text = "Select Check-Out Date"
             setTextColor(Color.parseColor("#B388FF"))
+        }
+
+        val paxInput = EditText(this).apply {
+            hint = "Enter number of persons (Pax), e.g. 2"
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.parseColor("#888888"))
+            inputType = InputType.TYPE_CLASS_NUMBER
+            setText("2")
+        }
+
+        val baseNum = resort.price.replace(Regex("[^0-9.]"), "").toDoubleOrNull() ?: 2500.0
+        val priceEstimateText = TextView(this).apply {
+            text = "Estimated Total: Php %,.2f (For 2 Pax)".format(baseNum * 2)
+            setTextColor(Color.parseColor("#45ED4D"))
+            textSize = 15f
+            setTypeface(null, Typeface.BOLD)
+            setPadding(0, 8, 0, 8)
+        }
+
+        paxInput.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                val pax = s.toString().toIntOrNull() ?: 1
+                val total = baseNum * if (pax > 0) pax else 1
+                priceEstimateText.text = "Estimated Total: Php %,.2f (For $pax Pax)".format(total)
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+
+        val cashPayBtn = Button(this).apply {
+            text = "Pay with Cash at Resort"
+            setTextColor(Color.parseColor("#45ED4D"))
+        }
+
+        val cardPayBtn = Button(this).apply {
+            text = "Credit/Debit Card (Unavailable / Disabled)"
+            setTextColor(Color.GRAY)
+            isEnabled = false
+            alpha = 0.5f
         }
 
         val cal = Calendar.getInstance()
@@ -354,33 +533,44 @@ class Mainscreen : AppCompatActivity() {
         dialogView.addView(titleText)
         dialogView.addView(checkInBtn)
         dialogView.addView(checkOutBtn)
+        dialogView.addView(paxInput)
+        dialogView.addView(priceEstimateText)
+        dialogView.addView(cashPayBtn)
+        dialogView.addView(cardPayBtn)
 
-        AlertDialog.Builder(this)
+        val dialog = AlertDialog.Builder(this)
             .setView(dialogView)
-            .setPositiveButton("Confirm Booking") { _, _ ->
-                val result = BookingManager.createBooking(
-                    touristEmail = currentUserEmail,
-                    resort = resort,
-                    checkInStr = checkInDateStr,
-                    checkOutStr = checkOutDateStr,
-                    paymentMethod = "Card"
-                )
+            .setNegativeButton("Cancel", null)
+            .create()
 
-                when (result) {
-                    is BookingManager.BookingResult.Success -> {
-                        Toast.makeText(this, "Booking submitted for ${resort.name}!", Toast.LENGTH_LONG).show()
-                        
-                        SupabaseCloudManager.uploadBookingToSupabase(result.booking) { _, _ -> }
+        cashPayBtn.setOnClickListener {
+            val paxStr = paxInput.text.toString().trim()
+            val pax = paxStr.toIntOrNull() ?: 1
 
-                        renderItinerary()
-                    }
-                    is BookingManager.BookingResult.Failure -> {
-                        DialogUtils.showFullErrorDialog(this, "Booking Error", result.errorMessage)
-                    }
+            val result = BookingManager.createBooking(
+                touristEmail = currentUserEmail,
+                resort = resort,
+                checkInStr = checkInDateStr,
+                checkOutStr = checkOutDateStr,
+                paymentMethod = "Cash ($pax Pax)"
+            )
+
+            when (result) {
+                is BookingManager.BookingResult.Success -> {
+                    Toast.makeText(this, "Booking submitted for $pax Pax at ${resort.name}!", Toast.LENGTH_LONG).show()
+                    
+                    SupabaseCloudManager.uploadBookingToSupabase(result.booking) { _, _ -> }
+
+                    renderItinerary()
+                    dialog.dismiss()
+                }
+                is BookingManager.BookingResult.Failure -> {
+                    DialogUtils.showFullErrorDialog(this, "Booking Error", result.errorMessage)
                 }
             }
-            .setNegativeButton("Cancel", null)
-            .show()
+        }
+
+        dialog.show()
     }
 
     private fun createResortView(resort: Resort): View {
@@ -389,22 +579,27 @@ class Mainscreen : AppCompatActivity() {
             setPadding(0, 16, 0, 24)
             setOnClickListener {
                 updateGpsMap(resort)
-                Toast.makeText(context, "GPS Map centered on ${resort.name}", Toast.LENGTH_SHORT).show()
             }
         }
 
         val nameTextView = TextView(this).apply {
             text = resort.name
             setTextColor(Color.WHITE)
-            textSize = 16f
-            typeface = Typeface.DEFAULT_BOLD
+            textSize = 17f
+            setTypeface(null, Typeface.BOLD)
         }
 
         val detailsTextView = TextView(this).apply {
-            text = "Rating: ${resort.rating}/5 | ${resort.price}\nGPS: ${resort.getGpsCoordinates()}"
+            val htmlText = "Rating: <font color='#45ED4D'><b>${resort.rating}/5</b></font> | Price: <font color='#45ED4D'><b>${resort.price}</b></font><br>GPS: ${resort.getGpsCoordinates()}"
+            text = Html.fromHtml(htmlText, Html.FROM_HTML_MODE_COMPACT)
             setTextColor(Color.parseColor("#CCCCCC"))
-            textSize = 13f
+            textSize = 14f
             setPadding(0, 4, 0, 8)
+        }
+
+        val buttonLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, 4, 0, 0)
         }
 
         val addButton = Button(this).apply {
@@ -417,9 +612,40 @@ class Mainscreen : AppCompatActivity() {
             }
         }
 
+        val viewButton = Button(this).apply {
+            text = "View"
+            setTextColor(Color.parseColor("#B388FF"))
+            textSize = 12f
+            setBackgroundColor(Color.TRANSPARENT)
+            setOnClickListener {
+                updateGpsMap(resort)
+                val amenitiesList = resortAmenitiesMap[resort.resortId] ?: resort.amenities
+                val intent = Intent(context, ResortDetailActivity::class.java).apply {
+                    putExtra("RESORT_ID", resort.resortId)
+                    putExtra("RESORT_NAME", resort.name)
+                    putExtra("RESORT_LOCATION", resort.location)
+                    putExtra("RESORT_RATING", resort.rating)
+                    putExtra("RESORT_PRICE", resort.price)
+                    putExtra("RESORT_LAT", resort.latitude)
+                    putExtra("RESORT_LON", resort.longitude)
+                    putExtra("RESORT_AVAILABLE", resort.isAvailable)
+                    putExtra("USER_EMAIL", currentUserEmail)
+                    putExtra("RESORT_CHECKIN", resort.checkInTime)
+                    putExtra("RESORT_CHECKOUT", resort.checkOutTime)
+                    putExtra("RESORT_DAYTOUR", resort.dayTourSchedule)
+                    putExtra("RESORT_FRONTDESK", resort.frontDeskHours)
+                    putStringArrayListExtra("RESORT_AMENITIES", ArrayList(amenitiesList))
+                }
+                startActivity(intent)
+            }
+        }
+
+        buttonLayout.addView(addButton)
+        buttonLayout.addView(viewButton)
+
         cardLayout.addView(nameTextView)
         cardLayout.addView(detailsTextView)
-        cardLayout.addView(addButton)
+        cardLayout.addView(buttonLayout)
 
         return cardLayout
     }

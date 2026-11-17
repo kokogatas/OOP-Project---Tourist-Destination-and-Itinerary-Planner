@@ -1,57 +1,31 @@
 package com.example.tdip
 
-// Taga-lista at taga-check ng accounts sa memory.
 object UserManager {
     private val users = mutableListOf<Person>()
-    private var idCounter = 1
 
     init {
-        // Default test accounts para sa login testing.
-        users.add(Tourist(idCounter++, "Mico Tourist", "tourist@example.com", "password123"))
-        users.add(ResortAdmin(idCounter++, "Admin User", "admin@example.com", "admin123", "Canyon Cove Resort"))
+        seedDefaultUsers()
     }
 
-    fun getAllUsers(): List<Person> {
-        return users
+    private fun seedDefaultUsers() {
+        if (users.none { it.email.equals("tourist@example.com", true) }) {
+            users.add(Tourist(1, "Mico Tourist", "tourist@example.com", "password123"))
+        }
+        if (users.none { it.email.equals("admin@example.com", true) }) {
+            users.add(ResortAdmin(2, "Admin User", "admin@example.com", "admin123", "Canyon Cove Hotel & Spa"))
+        }
     }
 
-    // Gumagawa at nagtatabi ng bagong Customer account.
-    fun registerTourist(name: String, email: String, pass: String): Tourist {
-        val cleanEmail = email.trim()
-        val cleanName = name.trim()
-
-        val existingIndex = users.indexOfFirst {
-            it.email.equals(cleanEmail, ignoreCase = true) || it.name.equals(cleanName, ignoreCase = true)
-        }
-        val tourist = Tourist(if (existingIndex >= 0) users[existingIndex].userId else idCounter++, cleanName, cleanEmail, pass)
-
-        if (existingIndex >= 0) {
-            users[existingIndex] = tourist
-        } else {
-            users.add(tourist)
-        }
-        return tourist
+    fun clearUsers() {
+        users.clear()
+        seedDefaultUsers()
     }
 
-    // Gumagawa at nagtatabi ng bagong Resort Admin account na naka-link sa isang resort.
-    fun registerAdmin(name: String, email: String, pass: String, resortName: String): ResortAdmin {
-        val cleanEmail = email.trim()
-        val cleanName = name.trim()
-
-        val existingIndex = users.indexOfFirst {
-            it.email.equals(cleanEmail, ignoreCase = true) || it.name.equals(cleanName, ignoreCase = true)
-        }
-        val admin = ResortAdmin(if (existingIndex >= 0) users[existingIndex].userId else idCounter++, cleanName, cleanEmail, pass, resortName)
-
-        if (existingIndex >= 0) {
-            users[existingIndex] = admin
-        } else {
-            users.add(admin)
-        }
-        return admin
+    fun addUser(person: Person) {
+        users.removeIf { it.email.equals(person.email, ignoreCase = true) }
+        users.add(person)
     }
 
-    // Chine-check kung tama ang email/username at password sa napiling role.
     fun login(emailOrName: String, pass: String, selectedRole: String): Person? {
         val cleanInput = emailOrName.trim()
         val cleanPass = pass.trim()

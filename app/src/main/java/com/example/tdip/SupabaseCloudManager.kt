@@ -12,13 +12,13 @@ import java.net.URL
 object SupabaseCloudManager {
 
     private const val SUPABASE_URL = "https://wrzfejimxuodjsoctjwd.supabase.co/rest/v1"
-
-
-    // wag pakealaman to pless <3
-    private const val SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndyemZlamlteHVvZGpzb2N0andkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQwNjQyODIsImV4cCI6MjEwOTY0MDI4Mn0.IB-8AKP6VMh8pGy0zFRSiKV5GdFveukLfuUnwT9U0ZI"
-
+    private const val SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndyemZlamlteHVvZGpzb2N0andkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQwNjQyODIsImV4cCI6MjE0OTY0MDI4Mn0.IB-8AKP6VMh8pGy0zFRSiKV5GdFveukLfuUnwT9U0ZI"
 
     fun fetchUsersFromSupabase(onResult: (Boolean, String) -> Unit) {
+        if (DatabaseConfig.bypassDatabase) {
+            onResult(true, "Database bypassed")
+            return
+        }
         Thread {
             try {
                 val cleanKey = SUPABASE_ANON_KEY.trim()
@@ -55,6 +55,10 @@ object SupabaseCloudManager {
     }
 
     fun fetchBookingsFromSupabase(onResult: (Boolean, String) -> Unit) {
+        if (DatabaseConfig.bypassDatabase) {
+            onResult(true, "Database bypassed")
+            return
+        }
         Thread {
             try {
                 val cleanKey = SUPABASE_ANON_KEY.trim()
@@ -93,19 +97,21 @@ object SupabaseCloudManager {
     private fun parseAndLoadUsers(jsonText: String) {
         try {
             val jsonArray = JSONArray(jsonText)
+            UserManager.clearUsers()
             for (i in 0 until jsonArray.length()) {
                 val obj = jsonArray.getJSONObject(i)
                 val role = obj.optString("role", "Customer")
                 val name = obj.optString("name", "")
                 val email = obj.optString("email", "")
                 val pass = obj.optString("password", "")
+                val id = obj.optInt("userid", 1)
 
                 if (email.isNotEmpty()) {
                     if (role == "Admin") {
                         val resort = if (obj.has("resortname")) obj.optString("resortname") else obj.optString("resortName", "Resort")
-                        UserManager.registerAdmin(name, email, pass, resort)
+                        UserManager.addUser(ResortAdmin(id, name, email, pass, resort))
                     } else {
-                        UserManager.registerTourist(name, email, pass)
+                        UserManager.addUser(Tourist(id, name, email, pass))
                     }
                 }
             }
@@ -128,7 +134,7 @@ object SupabaseCloudManager {
                 val status = obj.optString("status", "Pending")
                 val email = if (obj.has("touristemail")) obj.optString("touristemail") else obj.optString("email", "")
 
-                val dummyResort = Resort(resortId, resortName, "Nasugbu, Batangas", listOf("All"), 4.5, "Standard")
+                val dummyResort = Resort(resortId, resortName, "Nasugbu, Batangas", listOf("All"), 4.5, "Standard", 14.0722, 120.6288)
                 val booking = Booking(id, dummyResort, checkIn, checkOut, status, email)
                 newList.add(booking)
             }
@@ -139,6 +145,10 @@ object SupabaseCloudManager {
     }
 
     fun uploadUserToSupabase(user: Person, onResult: (Boolean, String) -> Unit) {
+        if (DatabaseConfig.bypassDatabase) {
+            onResult(true, "Database bypassed")
+            return
+        }
         Thread {
             try {
                 val cleanKey = SUPABASE_ANON_KEY.trim()
@@ -176,19 +186,23 @@ object SupabaseCloudManager {
                     val err = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
                     Log.e("SupabaseCloud", "POST Users error ${connection.responseCode}: $err")
                     Handler(Looper.getMainLooper()).post {
-                        onResult(false, "User registered locally.")
+                        onResult(false, "Cloud POST Error (HTTP ${connection.responseCode})")
                     }
                 }
             } catch (e: Exception) {
                 Log.e("SupabaseCloud", "POST Users exception: ${e.message}")
                 Handler(Looper.getMainLooper()).post {
-                    onResult(false, "User registered locally.")
+                    onResult(false, "Cloud upload error: ${e.message}")
                 }
             }
         }.start()
     }
 
     fun uploadBookingToSupabase(booking: Booking, onResult: (Boolean, String) -> Unit) {
+        if (DatabaseConfig.bypassDatabase) {
+            onResult(true, "Database bypassed")
+            return
+        }
         Thread {
             try {
                 val cleanKey = SUPABASE_ANON_KEY.trim()
@@ -221,19 +235,23 @@ object SupabaseCloudManager {
                     val err = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
                     Log.e("SupabaseCloud", "POST Bookings error ${connection.responseCode}: $err")
                     Handler(Looper.getMainLooper()).post {
-                        onResult(false, "Booking saved locally.")
+                        onResult(false, "Cloud POST Error (HTTP ${connection.responseCode})")
                     }
                 }
             } catch (e: Exception) {
                 Log.e("SupabaseCloud", "POST Bookings exception: ${e.message}")
                 Handler(Looper.getMainLooper()).post {
-                    onResult(false, "Booking saved locally.")
+                    onResult(false, "Cloud upload error: ${e.message}")
                 }
             }
         }.start()
     }
 
     fun deleteBookingFromSupabase(bookingId: Int, onResult: (Boolean, String) -> Unit) {
+        if (DatabaseConfig.bypassDatabase) {
+            onResult(true, "Database bypassed")
+            return
+        }
         Thread {
             try {
                 val cleanKey = SUPABASE_ANON_KEY.trim()
@@ -254,19 +272,23 @@ object SupabaseCloudManager {
                     val err = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
                     Log.e("SupabaseCloud", "DELETE Bookings error ${connection.responseCode}: $err")
                     Handler(Looper.getMainLooper()).post {
-                        onResult(false, "Booking cancelled locally.")
+                        onResult(false, "Cloud DELETE Error (HTTP ${connection.responseCode})")
                     }
                 }
             } catch (e: Exception) {
                 Log.e("SupabaseCloud", "DELETE Bookings exception: ${e.message}")
                 Handler(Looper.getMainLooper()).post {
-                    onResult(false, "Booking cancelled locally.")
+                    onResult(false, "Cloud delete error: ${e.message}")
                 }
             }
         }.start()
     }
 
     fun updateBookingStatusInSupabase(bookingId: Int, newStatus: String, onResult: (Boolean, String) -> Unit) {
+        if (DatabaseConfig.bypassDatabase) {
+            onResult(true, "Database bypassed")
+            return
+        }
         Thread {
             try {
                 val cleanKey = SUPABASE_ANON_KEY.trim()
@@ -294,13 +316,13 @@ object SupabaseCloudManager {
                     val err = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
                     Log.e("SupabaseCloud", "PATCH Bookings error ${connection.responseCode}: $err")
                     Handler(Looper.getMainLooper()).post {
-                        onResult(false, "Booking updated locally.")
+                        onResult(false, "Cloud PATCH Error (HTTP ${connection.responseCode})")
                     }
                 }
             } catch (e: Exception) {
                 Log.e("SupabaseCloud", "PATCH Bookings exception: ${e.message}")
                 Handler(Looper.getMainLooper()).post {
-                    onResult(false, "Booking updated localy.")
+                    onResult(false, "Cloud update error: ${e.message}")
                 }
             }
         }.start()
