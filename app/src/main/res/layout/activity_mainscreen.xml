@@ -39,7 +39,6 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@+id/greeting_title" />
 
-        <!-- MapLibre Map Container -->
         <FrameLayout
             android:id="@+id/map_container"
             android:layout_width="0dp"
@@ -82,18 +81,34 @@
 
         </FrameLayout>
 
-        <!-- Active Itinerary Section -->
+        <!-- Yellow Schedule Conflict Warning Banner -->
+        <TextView
+            android:id="@+id/tv_schedule_warning_banner"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="#FFB300"
+            android:padding="10dp"
+            android:text="⚠️ Schedule Conflict Warning: You have overlapping dates booked at different resorts!"
+            android:textColor="@color/black"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:visibility="gone"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/map_container" />
+
         <TextView
             android:id="@+id/itinerary_section_title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
+            android:layout_marginTop="12dp"
             android:text="My Active Itinerary"
             android:textColor="#B388FF"
             android:textSize="18sp"
             android:textStyle="bold"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/map_container" />
+            app:layout_constraintTop_toBottomOf="@+id/tv_schedule_warning_banner" />
 
         <LinearLayout
             android:id="@+id/itinerary_list_container"

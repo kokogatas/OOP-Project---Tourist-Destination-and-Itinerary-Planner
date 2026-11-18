@@ -38,7 +38,9 @@ import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
+import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Locale
 
 class Mainscreen : AppCompatActivity() {
 
@@ -46,6 +48,7 @@ class Mainscreen : AppCompatActivity() {
     private lateinit var itineraryListContainer: LinearLayout
     private lateinit var searchEditText: EditText
     private lateinit var tvMapOverlay: TextView
+    private lateinit var tvWarningBanner: TextView
     private lateinit var mapLibreView: MapView
     private lateinit var btnOpenGoogleMaps: Button
 
@@ -111,6 +114,7 @@ class Mainscreen : AppCompatActivity() {
         itineraryListContainer = findViewById(R.id.itinerary_list_container)
         searchEditText = findViewById(R.id.search_edit_text)
         tvMapOverlay = findViewById(R.id.tv_map_overlay)
+        tvWarningBanner = findViewById(R.id.tv_schedule_warning_banner)
         mapLibreView = findViewById(R.id.mapView)
         btnOpenGoogleMaps = findViewById(R.id.btn_open_google_maps)
 
@@ -210,26 +214,6 @@ class Mainscreen : AppCompatActivity() {
     private fun updateGpsMap(resort: Resort) {
         currentlySelectedResort = resort
 
-        mapLibreView.getMapAsync { map ->
-            map.setStyle(Style.Builder().fromUri("https://styles.maptoolkit.org/summer.json")) { _ ->
-                map.removeAnnotations()
-
-                val resortPoint = LatLng(resort.latitude, resort.longitude)
-                map.addMarker(MarkerOptions().position(resortPoint).title("📍 ${resort.name}"))
-
-                if (userLocation != null) {
-                    val userPoint = LatLng(userLocation!!.latitude, userLocation!!.longitude)
-                    map.addMarker(MarkerOptions().position(userPoint).title("📍 Your GPS Location"))
-                }
-
-                val cameraPosition = CameraPosition.Builder()
-                    .target(resortPoint)
-                    .zoom(14.0)
-                    .build()
-                map.cameraPosition = cameraPosition
-            }
-        }
-
         var distanceText = ""
         val locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
         val isGpsOn = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) || locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
@@ -253,9 +237,54 @@ class Mainscreen : AppCompatActivity() {
         tvMapOverlay.setTextColor(Color.WHITE)
     }
 
+    private fun calculateNights(checkInStr: String, checkOutStr: String): Int {
+        return try {
+            val df = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+            val inDate = df.parse(checkInStr)
+            val outDate = df.parse(checkOutStr)
+            if (inDate != null && outDate != null) {
+                val diffMs = outDate.time - inDate.time
+                val diffDays = (diffMs / (1000 * 60 * 60 * 24)).toInt()
+                if (diffDays > 0) diffDays else 1
+            } else {
+                1
+            }
+        } catch (e: Exception) {
+            1
+        }
+    }
+
     private fun renderItinerary() {
         itineraryListContainer.removeAllViews()
         val userBookings = BookingManager.getTouristBookings(currentUserEmail)
+
+        var hasConflict = false
+        for (i in 0 until userBookings.size) {
+            for (j in i + 1 until userBookings.size) {
+                val b1 = userBookings[i]
+                val b2 = userBookings[j]
+                try {
+                    val df = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+                    val in1 = df.parse(b1.checkInDate)
+                    val out1 = df.parse(b1.checkOutDate)
+                    val in2 = df.parse(b2.checkInDate)
+                    val out2 = df.parse(b2.checkOutDate)
+                    if (in1 != null && out1 != null && in2 != null && out2 != null) {
+                        if (in1.before(out2) && out1.after(in2)) {
+                            hasConflict = true
+                        }
+                    }
+                } catch (e: Exception) {
+                }
+            }
+        }
+
+        if (hasConflict) {
+            tvWarningBanner.visibility = View.VISIBLE
+            tvWarningBanner.text = "Schedule Conflict Warning: You have overlapping booking dates between multiple resorts! You sure about that?"
+        } else {
+            tvWarningBanner.visibility = View.GONE
+        }
 
         if (userBookings.isEmpty()) {
             val emptyTextView = TextView(this).apply {
@@ -295,11 +324,12 @@ class Mainscreen : AppCompatActivity() {
                 else -> "Pending Approval" to "#FFB300"
             }
 
-            val baseNum = booking.resort.price.replace(Regex("[^0-9.]"), "").toDoubleOrNull() ?: 3500.0
-            val approxTotal = baseNum * 2
+            val baseNum = booking.resort.price.replace(Regex("[^0-9.]"), "").toDoubleOrNull() ?: 2500.0
+            val nights = calculateNights(booking.checkInDate, booking.checkOutDate)
+            val approxTotal = baseNum * nights
 
             val datesText = TextView(this).apply {
-                text = "Dates: ${booking.checkInDate} to ${booking.checkOutDate}\n$statusLabel\nApprox. Total: Php %,.2f".format(approxTotal)
+                text = "Dates: ${booking.checkInDate} to ${booking.checkOutDate} ($nights Night${if (nights > 1) "s" else ""})\n$statusLabel\nApprox. Total: Php %,.2f".format(approxTotal)
                 setTextColor(Color.parseColor(statusColor))
                 textSize = 14f
                 setTypeface(null, Typeface.BOLD)
@@ -469,20 +499,41 @@ class Mainscreen : AppCompatActivity() {
         }
 
         val baseNum = resort.price.replace(Regex("[^0-9.]"), "").toDoubleOrNull() ?: 2500.0
+        
+        val cal = Calendar.getInstance()
+        val defaultYear = cal.get(Calendar.YEAR)
+        val defaultMonth = cal.get(Calendar.MONTH)
+        val defaultDay = cal.get(Calendar.DAY_OF_MONTH)
+
+        val checkInDefault = String.format("%04d-%02d-%02d", defaultYear, defaultMonth + 1, defaultDay)
+        cal.add(Calendar.DAY_OF_YEAR, 1)
+        val checkOutDefault = String.format("%04d-%02d-%02d", cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH))
+
+        var checkInDateStr = checkInDefault
+        var checkOutDateStr = checkOutDefault
+
+        val initialNights = calculateNights(checkInDateStr, checkOutDateStr)
+        val initialTotal = baseNum * 2 * initialNights
+
         val priceEstimateText = TextView(this).apply {
-            text = "Estimated Total: Php %,.2f (For 2 Pax)".format(baseNum * 2)
+            text = "Estimated Total: Php %,.2f (For 2 Pax, $initialNights Nights)".format(initialTotal)
             setTextColor(Color.parseColor("#45ED4D"))
             textSize = 15f
             setTypeface(null, Typeface.BOLD)
             setPadding(0, 8, 0, 8)
         }
 
+        fun updateEstimate() {
+            val pax = paxInput.text.toString().toIntOrNull() ?: 1
+            val nights = calculateNights(checkInDateStr, checkOutDateStr)
+            val total = baseNum * (if (pax > 0) pax else 1) * nights
+            priceEstimateText.text = "Estimated Total: Php %,.2f (For $pax Pax, $nights Nights)".format(total)
+        }
+
         paxInput.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                val pax = s.toString().toIntOrNull() ?: 1
-                val total = baseNum * if (pax > 0) pax else 1
-                priceEstimateText.text = "Estimated Total: Php %,.2f (For $pax Pax)".format(total)
+                updateEstimate()
             }
             override fun afterTextChanged(s: Editable?) {}
         })
@@ -499,18 +550,6 @@ class Mainscreen : AppCompatActivity() {
             alpha = 0.5f
         }
 
-        val cal = Calendar.getInstance()
-        val defaultYear = cal.get(Calendar.YEAR)
-        val defaultMonth = cal.get(Calendar.MONTH)
-        val defaultDay = cal.get(Calendar.DAY_OF_MONTH)
-
-        val checkInDefault = String.format("%04d-%02d-%02d", defaultYear, defaultMonth + 1, defaultDay)
-        cal.add(Calendar.DAY_OF_YEAR, 1)
-        val checkOutDefault = String.format("%04d-%02d-%02d", cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH))
-
-        var checkInDateStr = checkInDefault
-        var checkOutDateStr = checkOutDefault
-
         checkInBtn.text = "Check-In: $checkInDateStr"
         checkOutBtn.text = "Check-Out: $checkOutDateStr"
 
@@ -519,6 +558,7 @@ class Mainscreen : AppCompatActivity() {
             DatePickerDialog(this, { _, year, month, day ->
                 checkInDateStr = String.format("%04d-%02d-%02d", year, month + 1, day)
                 checkInBtn.text = "Check-In: $checkInDateStr"
+                updateEstimate()
             }, pickerCal.get(Calendar.YEAR), pickerCal.get(Calendar.MONTH), pickerCal.get(Calendar.DAY_OF_MONTH)).show()
         }
 
@@ -527,6 +567,7 @@ class Mainscreen : AppCompatActivity() {
             DatePickerDialog(this, { _, year, month, day ->
                 checkOutDateStr = String.format("%04d-%02d-%02d", year, month + 1, day)
                 checkOutBtn.text = "Check-Out: $checkOutDateStr"
+                updateEstimate()
             }, pickerCal.get(Calendar.YEAR), pickerCal.get(Calendar.MONTH), pickerCal.get(Calendar.DAY_OF_MONTH)).show()
         }
 
