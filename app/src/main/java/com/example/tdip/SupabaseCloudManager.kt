@@ -12,7 +12,7 @@ import java.net.URL
 object SupabaseCloudManager {
 
     private const val SUPABASE_URL = "https://wrzfejimxuodjsoctjwd.supabase.co/rest/v1"
-    private const val SUPABASE_SERVICE_KEY = "sb_secret_xJsuvBJjnjPEvUM2nKTa0w_hNLjS6_n"
+    private const val SUPABASE_SERVICE_KEY = "###############api key################"
 
     fun fetchUsersFromSupabase(onResult: (Boolean, String) -> Unit) {
         if (DatabaseConfig.bypassDatabase) {
