@@ -12,7 +12,7 @@ import java.net.URL
 object SupabaseCloudManager {
 
     private const val SUPABASE_URL = "https://wrzfejimxuodjsoctjwd.supabase.co/rest/v1"
-    private const val SUPABASE_SERVICE_KEY = "#### API KEY NOT INCLUDED ####"
+    private const val SUPABASE_SERVICE_KEY = "#### API KEY NOT SHOWN ####"
 
     fun fetchUsersFromSupabase(onResult: (Boolean, String) -> Unit) {
         if (DatabaseConfig.bypassDatabase) {
@@ -42,7 +42,7 @@ object SupabaseCloudManager {
                     val err = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
                     Log.e("SupabaseCloud", "GET Users error ${connection.responseCode}: $err")
                     Handler(Looper.getMainLooper()).post {
-                        onResult(false, "HTTP ${connection.responseCode}: $err")
+                        onResult(false, "HTTP ${connection.responseCode}")
                     }
                 }
             } catch (e: Exception) {
@@ -82,7 +82,7 @@ object SupabaseCloudManager {
                     val err = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
                     Log.e("SupabaseCloud", "GET Bookings error ${connection.responseCode}: $err")
                     Handler(Looper.getMainLooper()).post {
-                        onResult(false, "HTTP ${connection.responseCode}: $err")
+                        onResult(false, "HTTP ${connection.responseCode}")
                     }
                 }
             } catch (e: Exception) {
@@ -134,8 +134,8 @@ object SupabaseCloudManager {
                 val status = obj.optString("status", "Pending")
                 val email = if (obj.has("touristemail")) obj.optString("touristemail") else obj.optString("email", "")
 
-                val dummyResort = Resort(resortId, resortName, "Nasugbu, Batangas", listOf("All"), 4.5, "Standard", 14.0722, 120.6288)
-                val booking = Booking(id, dummyResort, checkIn, checkOut, status, email)
+                val officialResort = BookingManager.getOfficialResort(resortId, resortName)
+                val booking = Booking(id, officialResort, checkIn, checkOut, status, email)
                 newList.add(booking)
             }
             BookingManager.setAllBookings(newList)
@@ -224,6 +224,7 @@ object SupabaseCloudManager {
                 obj.put("checkoutdate", booking.checkOutDate)
                 obj.put("status", booking.status)
                 obj.put("touristemail", booking.touristEmail)
+                obj.put("price", booking.resort.price)
 
                 OutputStreamWriter(connection.outputStream).use { it.write(obj.toString()) }
 
