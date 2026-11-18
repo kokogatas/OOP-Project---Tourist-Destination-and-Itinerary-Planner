@@ -31,13 +31,13 @@ object UserManager {
         val cleanPass = pass.trim()
 
         val foundUser = users.find {
-            (it.email.equals(cleanInput, ignoreCase = true) || it.name.equals(cleanInput, ignoreCase = true))
-                    && it.verifyPassword(cleanPass)
+            (it.email.trim().equals(cleanInput, ignoreCase = true) || it.name.trim().equals(cleanInput, ignoreCase = true))
+                    && (it.password.trim() == cleanPass || it.verifyPassword(cleanPass))
         }
         if (foundUser == null) return null
 
-        return when (selectedRole) {
-            "Admin" -> if (foundUser is ResortAdmin) foundUser else null
+        return when {
+            selectedRole.equals("Admin", ignoreCase = true) -> if (foundUser is ResortAdmin) foundUser else null
             else -> if (foundUser is Tourist) foundUser else null
         }
     }

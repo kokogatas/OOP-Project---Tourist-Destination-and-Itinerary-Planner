@@ -92,17 +92,16 @@ class RegisterActivity : AppCompatActivity() {
                 Tourist((1000..9999).random(), name, email, password)
             }
 
+            UserManager.addUser(registeredUser)
+
             Toast.makeText(this, "Uploading user to Database...", Toast.LENGTH_SHORT).show()
             SupabaseCloudManager.uploadUserToSupabase(registeredUser) { success, msg ->
                 if (success) {
                     Toast.makeText(this, "Registered and saved to Database!", Toast.LENGTH_SHORT).show()
                     finish()
                 } else {
-                    DialogUtils.showFullErrorDialog(
-                        this,
-                        "Database Registration Response",
-                        "Status:\n$msg"
-                    )
+                    Toast.makeText(this, "Registered locally. Database status: $msg", Toast.LENGTH_LONG).show()
+                    finish()
                 }
             }
         }

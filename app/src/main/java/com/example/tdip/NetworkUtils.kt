@@ -7,7 +7,7 @@ import android.net.NetworkCapabilities
 object NetworkUtils {
 
     // for dev purposes, bypass switch
-    var bypassInternet: Boolean = true
+    var bypassInternet: Boolean = false
 
     fun isInternetAvailable(context: Context): Boolean {
         if (bypassInternet) return true

@@ -12,7 +12,7 @@ import java.net.URL
 object SupabaseCloudManager {
 
     private const val SUPABASE_URL = "https://wrzfejimxuodjsoctjwd.supabase.co/rest/v1"
-    private const val SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndyemZlamlteHVvZGpzb2N0andkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQwNjQyODIsImV4cCI6MjE0OTY0MDI4Mn0.IB-8AKP6VMh8pGy0zFRSiKV5GdFveukLfuUnwT9U0ZI"
+    private const val SUPABASE_SERVICE_KEY = "sb_secret_xJsuvBJjnjPEvUM2nKTa0w_hNLjS6_n"
 
     fun fetchUsersFromSupabase(onResult: (Boolean, String) -> Unit) {
         if (DatabaseConfig.bypassDatabase) {
@@ -21,7 +21,7 @@ object SupabaseCloudManager {
         }
         Thread {
             try {
-                val cleanKey = SUPABASE_ANON_KEY.trim()
+                val cleanKey = SUPABASE_SERVICE_KEY.trim()
                 val endpoint = "$SUPABASE_URL/users?select=*"
                 val url = URL(endpoint)
                 val connection = url.openConnection() as HttpURLConnection
@@ -42,7 +42,7 @@ object SupabaseCloudManager {
                     val err = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
                     Log.e("SupabaseCloud", "GET Users error ${connection.responseCode}: $err")
                     Handler(Looper.getMainLooper()).post {
-                        onResult(false, "HTTP ${connection.responseCode}")
+                        onResult(false, "HTTP ${connection.responseCode}: $err")
                     }
                 }
             } catch (e: Exception) {
@@ -61,7 +61,7 @@ object SupabaseCloudManager {
         }
         Thread {
             try {
-                val cleanKey = SUPABASE_ANON_KEY.trim()
+                val cleanKey = SUPABASE_SERVICE_KEY.trim()
                 val endpoint = "$SUPABASE_URL/bookings?select=*"
                 val url = URL(endpoint)
                 val connection = url.openConnection() as HttpURLConnection
@@ -82,7 +82,7 @@ object SupabaseCloudManager {
                     val err = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
                     Log.e("SupabaseCloud", "GET Bookings error ${connection.responseCode}: $err")
                     Handler(Looper.getMainLooper()).post {
-                        onResult(false, "HTTP ${connection.responseCode}")
+                        onResult(false, "HTTP ${connection.responseCode}: $err")
                     }
                 }
             } catch (e: Exception) {
@@ -107,7 +107,7 @@ object SupabaseCloudManager {
                 val id = obj.optInt("userid", 1)
 
                 if (email.isNotEmpty()) {
-                    if (role == "Admin") {
+                    if (role.contains("admin", ignoreCase = true)) {
                         val resort = if (obj.has("resortname")) obj.optString("resortname") else obj.optString("resortName", "Resort")
                         UserManager.addUser(ResortAdmin(id, name, email, pass, resort))
                     } else {
@@ -151,7 +151,7 @@ object SupabaseCloudManager {
         }
         Thread {
             try {
-                val cleanKey = SUPABASE_ANON_KEY.trim()
+                val cleanKey = SUPABASE_SERVICE_KEY.trim()
                 val endpoint = "$SUPABASE_URL/users"
                 val url = URL(endpoint)
                 val connection = url.openConnection() as HttpURLConnection
@@ -186,7 +186,7 @@ object SupabaseCloudManager {
                     val err = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
                     Log.e("SupabaseCloud", "POST Users error ${connection.responseCode}: $err")
                     Handler(Looper.getMainLooper()).post {
-                        onResult(false, "Cloud POST Error (HTTP ${connection.responseCode})")
+                        onResult(false, "Cloud POST Error (HTTP ${connection.responseCode}): $err")
                     }
                 }
             } catch (e: Exception) {
@@ -205,7 +205,7 @@ object SupabaseCloudManager {
         }
         Thread {
             try {
-                val cleanKey = SUPABASE_ANON_KEY.trim()
+                val cleanKey = SUPABASE_SERVICE_KEY.trim()
                 val endpoint = "$SUPABASE_URL/bookings"
                 val url = URL(endpoint)
                 val connection = url.openConnection() as HttpURLConnection
@@ -235,7 +235,7 @@ object SupabaseCloudManager {
                     val err = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
                     Log.e("SupabaseCloud", "POST Bookings error ${connection.responseCode}: $err")
                     Handler(Looper.getMainLooper()).post {
-                        onResult(false, "Cloud POST Error (HTTP ${connection.responseCode})")
+                        onResult(false, "Cloud POST Error (HTTP ${connection.responseCode}): $err")
                     }
                 }
             } catch (e: Exception) {
@@ -254,7 +254,7 @@ object SupabaseCloudManager {
         }
         Thread {
             try {
-                val cleanKey = SUPABASE_ANON_KEY.trim()
+                val cleanKey = SUPABASE_SERVICE_KEY.trim()
                 val endpoint = "$SUPABASE_URL/bookings?bookingid=eq.$bookingId"
                 val url = URL(endpoint)
                 val connection = url.openConnection() as HttpURLConnection
@@ -272,7 +272,7 @@ object SupabaseCloudManager {
                     val err = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
                     Log.e("SupabaseCloud", "DELETE Bookings error ${connection.responseCode}: $err")
                     Handler(Looper.getMainLooper()).post {
-                        onResult(false, "Cloud DELETE Error (HTTP ${connection.responseCode})")
+                        onResult(false, "Cloud DELETE Error (HTTP ${connection.responseCode}): $err")
                     }
                 }
             } catch (e: Exception) {
@@ -291,7 +291,7 @@ object SupabaseCloudManager {
         }
         Thread {
             try {
-                val cleanKey = SUPABASE_ANON_KEY.trim()
+                val cleanKey = SUPABASE_SERVICE_KEY.trim()
                 val endpoint = "$SUPABASE_URL/bookings?bookingid=eq.$bookingId"
                 val url = URL(endpoint)
                 val connection = url.openConnection() as HttpURLConnection
@@ -316,7 +316,7 @@ object SupabaseCloudManager {
                     val err = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
                     Log.e("SupabaseCloud", "PATCH Bookings error ${connection.responseCode}: $err")
                     Handler(Looper.getMainLooper()).post {
-                        onResult(false, "Cloud PATCH Error (HTTP ${connection.responseCode})")
+                        onResult(false, "Cloud PATCH Error (HTTP ${connection.responseCode}): $err")
                     }
                 }
             } catch (e: Exception) {

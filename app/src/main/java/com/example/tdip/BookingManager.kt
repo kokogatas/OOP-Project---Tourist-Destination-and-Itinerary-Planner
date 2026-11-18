@@ -7,7 +7,6 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
-// Taga-check ng dates, nag-iwas sa double booking, at nag-co-convert ng JSON para sa cloud sync.
 object BookingManager {
 
     private val allBookings = mutableListOf<Booking>()
@@ -25,14 +24,12 @@ object BookingManager {
             try {
                 return format.parse(dateStr)
             } catch (e: Exception) {
-                // Try next format
             }
         }
         if (dateStr.length >= 10) {
             try {
                 return SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(dateStr.substring(0, 10))
             } catch (e: Exception) {
-                // Ignore
             }
         }
         return null
@@ -42,14 +39,12 @@ object BookingManager {
         return allBookings
     }
 
-    // Set and deduplicate bookings by bookingId
     fun setAllBookings(newBookings: List<Booking>) {
         val uniqueBookings = newBookings.distinctBy { it.bookingId }
         allBookings.clear()
         allBookings.addAll(uniqueBookings)
     }
 
-    // Pinipigilan ang pag-book sa nakalipas na petsa o kapag mas nauna ang check-out kaysa check-in.
     fun isInvalidDateRange(checkInStr: String, checkOutStr: String): String? {
         val checkInDate = parseDate(checkInStr) ?: return "Invalid check-in date format: '$checkInStr'."
         val checkOutDate = parseDate(checkOutStr) ?: return "Invalid check-out date format: '$checkOutStr'."
@@ -91,7 +86,6 @@ object BookingManager {
         return null
     }
 
-    // Chine-check kung may kaparehong petsa na na-book na sa parehong resort.
     fun hasDateConflict(resortId: Int, checkInStr: String, checkOutStr: String): Boolean {
         val newIn = parseDate(checkInStr) ?: return false
         val newOut = parseDate(checkOutStr) ?: return false
@@ -108,7 +102,6 @@ object BookingManager {
         }
     }
 
-    // Gumagawa ng bagong booking na may unique booking ID at initial status na 'Pending'
     fun createBooking(
         touristEmail: String,
         resort: Resort,
@@ -164,14 +157,60 @@ object BookingManager {
         return matches
     }
 
+    fun getOfficialResort(resortId: Int, resortName: String): Resort {
+        val officialResorts = listOf(
+            Resort(1, "Berna Beach Resort", "Beachfront, Nasugbu", listOf("All", "Budget", "WiFi", "Pool"), 4.0, "Php 1,500/night", 14.0687293198155, 120.62560921173868, true, "2:00 PM", "12:00 NN", "6:00 AM – 5:00 PM", "10:00 AM – 8:30 PM"),
+            Resort(2, "Calayo Beach Resort", "Calayo Beach Area, Nasugbu", listOf("All", "Budget", "Family", "WiFi"), 4.5, "Php 1,800/night", 14.146119552634666, 120.61212663872902, true, "2:00 PM", "12:00 PM", "N/A", "7:30 AM – 5:00 PM (Pool: 7:30 AM – 11:00 PM)"),
+            Resort(3, "Sand Bar Beach Resort", "Near Calayo Beach, Nasugbu", listOf("All", "Budget", "WiFi"), 4.1, "Php 2,200/night", 14.151478147970018, 120.60977798475078, true, "2:00 PM", "12:00 PM", "N/A", "Latest Check-in: 8:00 PM"),
+            Resort(4, "Pamana Resorts and Hotels", "Beachfront, Nasugbu", listOf("All", "Family", "WiFi"), 4.1, "Php 5,900/night", 14.152455482419331, 120.60930996556769, true, "2:00 PM", "12:00 PM", "N/A", "Latest Check-in: 8:00 PM"),
+            Resort(5, "Canyon Cove Hotel & Spa", "White-sand Beachfront, Nasugbu", listOf("All", "Pool", "Family", "Spa", "WiFi"), 3.8, "Php 3,800/night", 14.092536522979145, 120.62173702154001, true, "3:00 PM", "11:00 AM", "7:00 AM – 8:00 PM", "24/7 Front Desk"),
+            Resort(6, "Pico Sands Hotel", "Cove and Lagoon, Nasugbu", listOf("All", "Pool", "Spa", "Family", "WiFi"), 4.4, "Php 6,500/night", 14.192116211144523, 120.60208803872919, true, "2:00 PM", "11:00 AM", "N/A", "24/7 Front Desk"),
+            Resort(7, "Club Punta Fuego", "Private Resort Beach, Nasugbu", listOf("All", "Pool", "Spa", "WiFi"), 4.8, "Php 7,200/night", 14.133503675842242, 120.57975121173968, true, "2:00 PM", "12:00 PM", "N/A", "Standard Front Desk"),
+            Resort(8, "Shoreland Beach Resort powered by Cocotel", "Beachfront, Nasugbu", listOf("All", "Budget", "WiFi", "Pool"), 3.7, "Php 2,539/night", 14.06999023964827, 120.62567936756317, true, "2:00 PM", "12:00 PM", "N/A", "Latest Check-in: 9:00 PM"),
+            Resort(9, "RSAM Beach Resort by Cocotel", "Beachfront, Nasugbu", listOf("All", "Family", "WiFi"), 3.8, "Php 4,750/night", 14.15077504858209, 120.60990193688187, true, "2:00 PM", "12:00 PM", "N/A", "Standard Front Desk"),
+            Resort(10, "Pico De Loro Beach", "Cove and Lagoon, Nasugbu", listOf("All", "Pool", "Spa", "Family"), 4.4, "Php 5,500/night", 14.189976914403214, 120.59706429639938, true, "2:00 PM", "12:00 PM", "6:00 AM – 6:00 PM", "Private Members Club")
+        )
+        return officialResorts.find { it.resortId == resortId || it.name.equals(resortName, true) }
+            ?: officialResorts.find { it.name.contains(resortName, true) || resortName.contains(it.name, true) }
+            ?: officialResorts[4]
+    }
+
     fun getBookingsForResort(resortName: String): List<Booking> {
-        return allBookings.filter { 
-            (it.resort.name.contains(resortName, ignoreCase = true) || resortName.contains(it.resort.name, ignoreCase = true)) &&
-            !it.status.equals("Cancelled", true)
+        val cleanAdminResort = resortName.lowercase().trim()
+        val targetResortId = getResortIdByName(resortName)
+        return allBookings.filter { booking ->
+            if (booking.status.equals("Cancelled", true)) {
+                false
+            } else {
+                val bookingResortName = booking.resort.name.lowercase().trim()
+                val adminKeyword = cleanAdminResort.split(" ").firstOrNull() ?: cleanAdminResort
+                val bookingKeyword = bookingResortName.split(" ").firstOrNull() ?: bookingResortName
+
+                bookingResortName.contains(cleanAdminResort) ||
+                cleanAdminResort.contains(bookingResortName) ||
+                adminKeyword == bookingKeyword ||
+                booking.resort.resortId == targetResortId
+            }
         }
     }
 
-    // Nagka-cancel ng booking at nagtatanggal nito sa active list.
+    private fun getResortIdByName(name: String): Int {
+        val n = name.lowercase()
+        return when {
+            n.contains("berna") -> 1
+            n.contains("calayo") -> 2
+            n.contains("sand") -> 3
+            n.contains("pamana") -> 4
+            n.contains("canyon") -> 5
+            n.contains("pico sands") -> 6
+            n.contains("fuego") -> 7
+            n.contains("shoreland") -> 8
+            n.contains("rsam") -> 9
+            n.contains("loro") -> 10
+            else -> 5
+        }
+    }
+
     fun cancelBooking(bookingId: Int): Boolean {
         val booking = allBookings.find { it.bookingId == bookingId }
         if (booking != null) {
@@ -184,7 +223,6 @@ object BookingManager {
         return false
     }
 
-    // Gagawing JSON format para mai-push sa Cloud database.
     fun getBookingsAsJson(): String {
         val jsonArray = JSONArray()
         for (booking in allBookings) {
