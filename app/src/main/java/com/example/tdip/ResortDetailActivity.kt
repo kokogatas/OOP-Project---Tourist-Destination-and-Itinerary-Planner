@@ -2,9 +2,14 @@ package com.example.tdip
 
 import android.Manifest
 import android.app.DatePickerDialog
+import android.content.Context
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Typeface
 import android.location.Location
 import android.location.LocationManager
 import android.os.Bundle
@@ -12,8 +17,6 @@ import android.text.Editable
 import android.text.Html
 import android.text.InputType
 import android.text.TextWatcher
-import android.webkit.WebView
-import android.webkit.WebViewClient
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -25,6 +28,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import org.maplibre.android.annotations.Icon
+import org.maplibre.android.annotations.IconFactory
 import org.maplibre.android.annotations.MarkerOptions
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.geometry.LatLng
@@ -103,6 +108,19 @@ class ResortDetailActivity : AppCompatActivity() {
                     .build()
                 map.cameraPosition = cameraPosition
                 map.addMarker(MarkerOptions().position(LatLng(resortLat, resortLon)).title(resortName))
+
+                try {
+                    val locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
+                    if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                        val loc = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+                            ?: locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+                        if (loc != null) {
+                            val yellowIcon = getYellowMarkerIcon(this)
+                            map.addMarker(MarkerOptions().position(LatLng(loc.latitude, loc.longitude)).title("🟡 Your GPS Location").icon(yellowIcon))
+                        }
+                    }
+                } catch (e: Exception) {
+                }
             }
         }
 
@@ -160,6 +178,33 @@ class ResortDetailActivity : AppCompatActivity() {
 
         btnBook.setOnClickListener { showBookingDialog() }
         btnBack.setOnClickListener { finish() }
+    }
+
+    private fun getYellowMarkerIcon(context: Context): Icon {
+        val size = 64
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#FFD700")
+            style = Paint.Style.FILL
+        }
+        val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            style = Paint.Style.STROKE
+            strokeWidth = 4f
+        }
+        canvas.drawCircle(size / 2f, size / 2f, size / 2f - 4f, paint)
+        canvas.drawCircle(size / 2f, size / 2f, size / 2f - 4f, borderPaint)
+
+        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            textSize = 30f
+            textAlign = Paint.Align.CENTER
+            typeface = Typeface.DEFAULT_BOLD
+        }
+        canvas.drawText("🟡", size / 2f, size / 2f + 10f, textPaint)
+
+        return IconFactory.getInstance(context).fromBitmap(bitmap)
     }
 
     override fun onStart() { super.onStart(); mapLibreView.onStart() }
@@ -256,7 +301,7 @@ class ResortDetailActivity : AppCompatActivity() {
         val priceEstimateText = TextView(this).apply {
             text = "Estimated Total: Php %,.2f (For 2 Pax, $initialNights Nights)".format(initialTotal)
             setTextColor(Color.parseColor("#45ED4D"))
-            textSize = 14f
+            textSize = 15f
             setPadding(0, 8, 0, 8)
         }
 

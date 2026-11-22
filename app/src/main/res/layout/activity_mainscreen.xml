@@ -67,6 +67,19 @@
                 android:textSize="11sp" />
 
             <Button
+                android:id="@+id/btn_fullscreen_map"
+                style="@style/Widget.AppCompat.Button.Borderless"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_gravity="bottom|start"
+                android:layout_margin="8dp"
+                android:background="#CC000000"
+                android:paddingHorizontal="8dp"
+                android:text="Full Screen"
+                android:textColor="#B388FF"
+                android:textSize="10sp" />
+
+            <Button
                 android:id="@+id/btn_open_google_maps"
                 style="@style/Widget.AppCompat.Button.Borderless"
                 android:layout_width="wrap_content"

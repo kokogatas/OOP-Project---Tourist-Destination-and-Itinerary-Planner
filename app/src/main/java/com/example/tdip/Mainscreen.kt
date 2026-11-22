@@ -2,10 +2,14 @@ package com.example.tdip
 
 import android.Manifest
 import android.app.DatePickerDialog
+import android.content.Context
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
 import android.graphics.Typeface
 import android.location.Location
 import android.location.LocationManager
@@ -33,6 +37,8 @@ import androidx.core.view.WindowInsetsCompat
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import org.maplibre.android.annotations.Icon
+import org.maplibre.android.annotations.IconFactory
 import org.maplibre.android.annotations.MarkerOptions
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.geometry.LatLng
@@ -50,6 +56,7 @@ class Mainscreen : AppCompatActivity() {
     private lateinit var tvMapOverlay: TextView
     private lateinit var tvWarningBanner: TextView
     private lateinit var mapLibreView: MapView
+    private lateinit var btnFullScreenMap: Button
     private lateinit var btnOpenGoogleMaps: Button
 
     private var selectedCategory: String = "All"
@@ -116,6 +123,7 @@ class Mainscreen : AppCompatActivity() {
         tvMapOverlay = findViewById(R.id.tv_map_overlay)
         tvWarningBanner = findViewById(R.id.tv_schedule_warning_banner)
         mapLibreView = findViewById(R.id.mapView)
+        btnFullScreenMap = findViewById(R.id.btn_fullscreen_map)
         btnOpenGoogleMaps = findViewById(R.id.btn_open_google_maps)
 
         mapLibreView.onCreate(savedInstanceState)
@@ -131,6 +139,17 @@ class Mainscreen : AppCompatActivity() {
         if (currentUserEmail.isNotEmpty()) {
             val name = currentUserEmail.substringBefore("@")
             greetingTitle.text = "Welcome, $name"
+        }
+
+        btnFullScreenMap.setOnClickListener {
+            val targetResort = currentlySelectedResort ?: allResorts[0]
+            val intent = Intent(this, FullScreenMapActivity::class.java).apply {
+                putExtra("RESORT_ID", targetResort.resortId)
+                putExtra("RESORT_NAME", targetResort.name)
+                putExtra("RESORT_LAT", targetResort.latitude)
+                putExtra("RESORT_LON", targetResort.longitude)
+            }
+            startActivity(intent)
         }
 
         btnOpenGoogleMaps.setOnClickListener {
@@ -149,6 +168,33 @@ class Mainscreen : AppCompatActivity() {
 
         renderItinerary()
         renderResorts()
+    }
+
+    private fun getYellowMarkerIcon(context: Context): Icon {
+        val size = 64
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#FFD700")
+            style = Paint.Style.FILL
+        }
+        val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            style = Paint.Style.STROKE
+            strokeWidth = 4f
+        }
+        canvas.drawCircle(size / 2f, size / 2f, size / 2f - 4f, paint)
+        canvas.drawCircle(size / 2f, size / 2f, size / 2f - 4f, borderPaint)
+
+        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            textSize = 30f
+            textAlign = Paint.Align.CENTER
+            typeface = Typeface.DEFAULT_BOLD
+        }
+        canvas.drawText("🟡", size / 2f, size / 2f + 10f, textPaint)
+
+        return IconFactory.getInstance(context).fromBitmap(bitmap)
     }
 
     private fun fetchUserGpsLocationAndInitializeMap() {
@@ -192,7 +238,8 @@ class Mainscreen : AppCompatActivity() {
                 map.cameraPosition = cameraPosition
 
                 if (userLoc != null) {
-                    map.addMarker(MarkerOptions().position(LatLng(userLoc.latitude, userLoc.longitude)).title("📍 Your GPS Location"))
+                    val yellowIcon = getYellowMarkerIcon(this)
+                    map.addMarker(MarkerOptions().position(LatLng(userLoc.latitude, userLoc.longitude)).title("🟡 Your GPS Location").icon(yellowIcon))
                 }
 
                 for (resort in allResorts) {
@@ -213,6 +260,27 @@ class Mainscreen : AppCompatActivity() {
 
     private fun updateGpsMap(resort: Resort) {
         currentlySelectedResort = resort
+
+        mapLibreView.getMapAsync { map ->
+            map.setStyle(Style.Builder().fromUri("https://styles.maptoolkit.org/summer.json")) { _ ->
+                map.removeAnnotations()
+
+                val resortPoint = LatLng(resort.latitude, resort.longitude)
+                map.addMarker(MarkerOptions().position(resortPoint).title("📍 ${resort.name}"))
+
+                if (userLocation != null) {
+                    val yellowIcon = getYellowMarkerIcon(this)
+                    val userPoint = LatLng(userLocation!!.latitude, userLocation!!.longitude)
+                    map.addMarker(MarkerOptions().position(userPoint).title("🟡 Your GPS Location").icon(yellowIcon))
+                }
+
+                val cameraPosition = CameraPosition.Builder()
+                    .target(resortPoint)
+                    .zoom(14.0)
+                    .build()
+                map.cameraPosition = cameraPosition
+            }
+        }
 
         var distanceText = ""
         val locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
@@ -408,7 +476,8 @@ class Mainscreen : AppCompatActivity() {
             map.setStyle(Style.Builder().fromUri("https://styles.maptoolkit.org/summer.json")) { _ ->
                 map.removeAnnotations()
                 if (userLocation != null) {
-                    map.addMarker(MarkerOptions().position(LatLng(userLocation!!.latitude, userLocation!!.longitude)).title("📍 Your GPS Location"))
+                    val yellowIcon = getYellowMarkerIcon(this)
+                    map.addMarker(MarkerOptions().position(LatLng(userLocation!!.latitude, userLocation!!.longitude)).title("🟡 Your GPS Location").icon(yellowIcon))
                 }
                 val filtered = allResorts.filter { query.isEmpty() || it.name.contains(query, true) || it.location.contains(query, true) }
                 for (resort in filtered) {
@@ -600,7 +669,13 @@ class Mainscreen : AppCompatActivity() {
                 is BookingManager.BookingResult.Success -> {
                     Toast.makeText(this, "Booking submitted for $pax Pax at ${resort.name}!", Toast.LENGTH_LONG).show()
                     
-                    SupabaseCloudManager.uploadBookingToSupabase(result.booking) { _, _ -> }
+                    SupabaseCloudManager.uploadBookingToSupabase(result.booking) { success, msg ->
+                        if (success) {
+                            Toast.makeText(this, "Booking saved to Cloud!", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(this, "Booking saved locally ($msg)", Toast.LENGTH_SHORT).show()
+                        }
+                    }
 
                     renderItinerary()
                     dialog.dismiss()
