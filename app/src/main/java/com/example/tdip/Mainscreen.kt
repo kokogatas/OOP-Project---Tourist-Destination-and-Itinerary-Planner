@@ -326,10 +326,10 @@ class Mainscreen : AppCompatActivity() {
 
             val baseNum = booking.resort.price.replace(Regex("[^0-9.]"), "").toDoubleOrNull() ?: 2500.0
             val nights = calculateNights(booking.checkInDate, booking.checkOutDate)
-            val approxTotal = baseNum * nights
+            val displayTotal = if (booking.totalPrice > 0.0) booking.totalPrice else (baseNum * booking.pax * nights)
 
             val datesText = TextView(this).apply {
-                text = "Dates: ${booking.checkInDate} to ${booking.checkOutDate} ($nights Night${if (nights > 1) "s" else ""})\n$statusLabel\nApprox. Total: Php %,.2f".format(approxTotal)
+                text = "Dates: ${booking.checkInDate} to ${booking.checkOutDate} ($nights Night${if (nights > 1) "s" else ""}, ${booking.pax} Pax)\n$statusLabel\nTotal Price: Php %,.2f".format(displayTotal)
                 setTextColor(Color.parseColor(statusColor))
                 textSize = 14f
                 setTypeface(null, Typeface.BOLD)

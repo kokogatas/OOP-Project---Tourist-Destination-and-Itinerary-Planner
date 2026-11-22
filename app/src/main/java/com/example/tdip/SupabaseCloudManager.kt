@@ -12,7 +12,7 @@ import java.net.URL
 object SupabaseCloudManager {
 
     private const val SUPABASE_URL = "https://wrzfejimxuodjsoctjwd.supabase.co/rest/v1"
-    private const val SUPABASE_SERVICE_KEY = "#### API KEY NOT SHOWN ####"
+    private const val SUPABASE_SERVICE_KEY = "#### API KEY HIDDEN ####"
 
     fun fetchUsersFromSupabase(onResult: (Boolean, String) -> Unit) {
         if (DatabaseConfig.bypassDatabase) {
@@ -42,7 +42,7 @@ object SupabaseCloudManager {
                     val err = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
                     Log.e("SupabaseCloud", "GET Users error ${connection.responseCode}: $err")
                     Handler(Looper.getMainLooper()).post {
-                        onResult(false, "HTTP ${connection.responseCode}")
+                        onResult(false, "HTTP ${connection.responseCode}: $err")
                     }
                 }
             } catch (e: Exception) {
@@ -82,7 +82,7 @@ object SupabaseCloudManager {
                     val err = connection.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
                     Log.e("SupabaseCloud", "GET Bookings error ${connection.responseCode}: $err")
                     Handler(Looper.getMainLooper()).post {
-                        onResult(false, "HTTP ${connection.responseCode}")
+                        onResult(false, "HTTP ${connection.responseCode}: $err")
                     }
                 }
             } catch (e: Exception) {
@@ -108,7 +108,12 @@ object SupabaseCloudManager {
 
                 if (email.isNotEmpty()) {
                     if (role.contains("admin", ignoreCase = true)) {
-                        val resort = if (obj.has("resortname")) obj.optString("resortname") else obj.optString("resortName", "Resort")
+                        val resort = when {
+                            obj.has("resortname") && !obj.isNull("resortname") -> obj.optString("resortname")
+                            obj.has("resort") && !obj.isNull("resort") -> obj.optString("resort")
+                            obj.has("resortName") && !obj.isNull("resortName") -> obj.optString("resortName")
+                            else -> "Resort"
+                        }
                         UserManager.addUser(ResortAdmin(id, name, email, pass, resort))
                     } else {
                         UserManager.addUser(Tourist(id, name, email, pass))
@@ -124,6 +129,7 @@ object SupabaseCloudManager {
         try {
             val jsonArray = JSONArray(jsonText)
             val newList = mutableListOf<Booking>()
+            val existingBookings = BookingManager.getAllBookings()
             for (i in 0 until jsonArray.length()) {
                 val obj = jsonArray.getJSONObject(i)
                 val id = if (obj.has("bookingid")) obj.optInt("bookingid") else obj.optInt("bookingId", 100)
@@ -134,8 +140,12 @@ object SupabaseCloudManager {
                 val status = obj.optString("status", "Pending")
                 val email = if (obj.has("touristemail")) obj.optString("touristemail") else obj.optString("email", "")
 
+                val existing = existingBookings.find { it.bookingId == id }
+                val totalPrice = if (obj.has("totalprice") && !obj.isNull("totalprice")) obj.optDouble("totalprice") else (existing?.totalPrice ?: 0.0)
+                val pax = if (obj.has("pax") && !obj.isNull("pax")) obj.optInt("pax") else (existing?.pax ?: 1)
+
                 val officialResort = BookingManager.getOfficialResort(resortId, resortName)
-                val booking = Booking(id, officialResort, checkIn, checkOut, status, email)
+                val booking = Booking(id, officialResort, checkIn, checkOut, status, email, totalPrice, pax)
                 newList.add(booking)
             }
             BookingManager.setAllBookings(newList)
@@ -172,8 +182,11 @@ object SupabaseCloudManager {
                 if (user is ResortAdmin) {
                     obj.put("role", "Admin")
                     obj.put("resortname", user.resortName)
+                    obj.put("resort", user.resortName)
                 } else {
                     obj.put("role", "Customer")
+                    obj.put("resortname", "")
+                    obj.put("resort", "")
                 }
 
                 OutputStreamWriter(connection.outputStream).use { it.write(obj.toString()) }
@@ -225,6 +238,8 @@ object SupabaseCloudManager {
                 obj.put("status", booking.status)
                 obj.put("touristemail", booking.touristEmail)
                 obj.put("price", booking.resort.price)
+                obj.put("totalprice", booking.totalPrice)
+                obj.put("pax", booking.pax)
 
                 OutputStreamWriter(connection.outputStream).use { it.write(obj.toString()) }
 

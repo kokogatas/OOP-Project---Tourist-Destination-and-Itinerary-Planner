@@ -102,6 +102,29 @@ object BookingManager {
         }
     }
 
+    fun extractPax(paymentMethod: String): Int {
+        val regex = Regex("([0-9]+)\\s*Pax", RegexOption.IGNORE_CASE)
+        val match = regex.find(paymentMethod)
+        return match?.groupValues?.get(1)?.toIntOrNull() ?: 1
+    }
+
+    fun calculateNights(checkInStr: String, checkOutStr: String): Int {
+        return try {
+            val df = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+            val inDate = df.parse(checkInStr)
+            val outDate = df.parse(checkOutStr)
+            if (inDate != null && outDate != null) {
+                val diffMs = outDate.time - inDate.time
+                val diffDays = (diffMs / (1000 * 60 * 60 * 24)).toInt()
+                if (diffDays > 0) diffDays else 1
+            } else {
+                1
+            }
+        } catch (e: Exception) {
+            1
+        }
+    }
+
     fun createBooking(
         touristEmail: String,
         resort: Resort,
@@ -115,18 +138,19 @@ object BookingManager {
             return BookingResult.Failure(dateError)
         }
 
-        if (hasDateConflict(resort.resortId, checkInStr, checkOutStr)) {
-            return BookingResult.Failure("Date Conflict! This resort is already booked for the selected dates.")
-        }
+        val basePrice = resort.price.replace(Regex("[^0-9.]"), "").toDoubleOrNull() ?: 2500.0
+        val nights = calculateNights(checkInStr, checkOutStr)
+        val paxNum = extractPax(paymentMethod)
+        val computedTotal = basePrice * paxNum * nights
 
         val uniqueBookingId = ((System.currentTimeMillis() % 899999) + 100000).toInt()
 
         val payment: Payment = if (paymentMethod.contains("Card", ignoreCase = true)) {
             val gateway: PaymentProcessing = CardGateway()
-            val success = gateway.process(3500.0)
-            CardPayment(uniqueBookingId, if (success) 3500.0 else 0.0)
+            val success = gateway.process(computedTotal)
+            CardPayment(uniqueBookingId, if (success) computedTotal else 0.0)
         } else {
-            CashPayment(uniqueBookingId, 3500.0)
+            CashPayment(uniqueBookingId, computedTotal)
         }
         payment.pay()
 
@@ -136,7 +160,9 @@ object BookingManager {
             checkInDate = checkInStr,
             checkOutDate = checkOutStr,
             status = "Pending",
-            touristEmail = touristEmail
+            touristEmail = touristEmail,
+            totalPrice = computedTotal,
+            pax = paxNum
         )
 
         allBookings.add(newBooking)
@@ -235,6 +261,8 @@ object BookingManager {
                 obj.put("checkoutdate", booking.checkOutDate)
                 obj.put("status", booking.status)
                 obj.put("touristemail", booking.touristEmail)
+                obj.put("totalprice", booking.totalPrice)
+                obj.put("pax", booking.pax)
                 jsonArray.put(obj)
             }
         }
