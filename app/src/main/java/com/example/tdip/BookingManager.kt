@@ -125,6 +125,27 @@ object BookingManager {
         }
     }
 
+    private fun generateBookingId(checkInStr: String, checkOutStr: String): Int {
+        return try {
+            val df = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+            val checkInDate = df.parse(checkInStr)
+            val checkOutDate = df.parse(checkOutStr)
+            val calIn = Calendar.getInstance()
+            val calOut = Calendar.getInstance()
+            if (checkInDate != null) calIn.time = checkInDate
+            if (checkOutDate != null) calOut.time = checkOutDate
+
+            val inDay = calIn.get(Calendar.DAY_OF_MONTH)
+            val outDay = calOut.get(Calendar.DAY_OF_MONTH)
+            val customerQueue = (allBookings.size + 1) % 99
+
+            val rawId = (inDay * 10000) + (outDay * 100) + customerQueue
+            100000 + (rawId % 899999)
+        } catch (e: Exception) {
+            ((System.currentTimeMillis() % 899999) + 100000).toInt()
+        }
+    }
+
     fun createBooking(
         touristEmail: String,
         resort: Resort,
@@ -143,7 +164,7 @@ object BookingManager {
         val paxNum = extractPax(paymentMethod)
         val computedTotal = basePrice * paxNum * nights
 
-        val uniqueBookingId = ((System.currentTimeMillis() % 899999) + 100000).toInt()
+        val uniqueBookingId = generateBookingId(checkInStr, checkOutStr)
 
         val payment: Payment = if (paymentMethod.contains("Card", ignoreCase = true)) {
             val gateway: PaymentProcessing = CardGateway()
