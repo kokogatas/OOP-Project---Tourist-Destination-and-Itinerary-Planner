@@ -6,6 +6,7 @@ import android.graphics.Typeface
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.text.Html
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -14,8 +15,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import java.text.SimpleDateFormat
+import java.util.Locale
 
-// AdminScreen: Dashboard ng resort admin. Naka-3s auto refresh para nakikita ang live customer bookings mula sa Cloud!
 class AdminScreen : AppCompatActivity() {
 
     private lateinit var adminBookingsContainer: LinearLayout
@@ -25,7 +27,6 @@ class AdminScreen : AppCompatActivity() {
     private val refreshHandler = Handler(Looper.getMainLooper())
     private val refreshRunnable = object : Runnable {
         override fun run() {
-            // Live fetch sa Cloud bawat 3 segundo
             SupabaseCloudManager.fetchBookingsFromSupabase { _, _ ->
                 renderAdminBookings()
             }
@@ -75,6 +76,23 @@ class AdminScreen : AppCompatActivity() {
         refreshHandler.removeCallbacks(refreshRunnable)
     }
 
+    private fun calculateNights(checkInStr: String, checkOutStr: String): Int {
+        return try {
+            val df = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+            val inDate = df.parse(checkInStr)
+            val outDate = df.parse(checkOutStr)
+            if (inDate != null && outDate != null) {
+                val diffMs = outDate.time - inDate.time
+                val diffDays = (diffMs / (1000 * 60 * 60 * 24)).toInt()
+                if (diffDays > 0) diffDays else 1
+            } else {
+                1
+            }
+        } catch (e: Exception) {
+            1
+        }
+    }
+
     private fun renderAdminBookings() {
         adminBookingsContainer.removeAllViews()
         val resortBookings = BookingManager.getBookingsForResort(resortName)
@@ -106,14 +124,26 @@ class AdminScreen : AppCompatActivity() {
             val titleText = TextView(this).apply {
                 text = "Booking #${booking.bookingId} - ${booking.resort.name}"
                 setTextColor(Color.WHITE)
-                textSize = 15f
+                textSize = 16f
                 typeface = Typeface.DEFAULT_BOLD
             }
 
+            val baseNum = booking.resort.price.replace(Regex("[^0-9.]"), "").toDoubleOrNull() ?: 2500.0
+            val nights = calculateNights(booking.checkInDate, booking.checkOutDate)
+            val displayTotal = if (booking.totalPrice > 0.0) booking.totalPrice else (baseNum * booking.pax * nights)
+            val emailDisplay = if (booking.touristEmail.isNotEmpty()) booking.touristEmail else "Customer"
+            val formattedPrice = String.format(Locale.US, "Php %,.2f", displayTotal)
+
+            val detailsHtml = "<b>Customer:</b> <font color='#B388FF'>$emailDisplay</font><br>" +
+                    "<b>Dates:</b> ${booking.checkInDate} to ${booking.checkOutDate} (<font color='#45ED4D'><b>$nights Night${if (nights > 1) "s" else ""}</b></font>)<br>" +
+                    "<b>Guests:</b> <font color='#45ED4D'><b>${booking.pax} Pax</b></font><br>" +
+                    "<b>Total Price:</b> <font color='#45ED4D'><b>$formattedPrice</b></font><br>" +
+                    "<b>Status:</b> ${booking.status}"
+
             val detailsText = TextView(this).apply {
-                text = "Check-In: ${booking.checkInDate} | Check-Out: ${booking.checkOutDate}\nStatus: ${booking.status}"
+                text = Html.fromHtml(detailsHtml, Html.FROM_HTML_MODE_COMPACT)
                 setTextColor(Color.parseColor("#CCCCCC"))
-                textSize = 13f
+                textSize = 14f
                 setPadding(0, 4, 0, 8)
             }
 
@@ -121,7 +151,6 @@ class AdminScreen : AppCompatActivity() {
                 orientation = LinearLayout.HORIZONTAL
             }
 
-            // Admin Approve Button
             val btnConfirm = Button(this).apply {
                 text = "Approve"
                 setTextColor(Color.parseColor("#45ED4D"))
@@ -135,7 +164,6 @@ class AdminScreen : AppCompatActivity() {
                 }
             }
 
-            // Admin Not Approved / Reject Button
             val btnNotApproved = Button(this).apply {
                 text = "Not Approved"
                 setTextColor(Color.parseColor("#FF5252"))
@@ -149,7 +177,6 @@ class AdminScreen : AppCompatActivity() {
                 }
             }
 
-            // Admin Cancel / Delete Button
             val btnCancel = Button(this).apply {
                 text = "Cancel"
                 setTextColor(Color.parseColor("#888888"))

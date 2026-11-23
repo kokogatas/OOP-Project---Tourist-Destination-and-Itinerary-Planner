@@ -2,14 +2,10 @@ package com.example.tdip
 
 import android.Manifest
 import android.app.DatePickerDialog
-import android.content.Context
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.Paint
 import android.graphics.Typeface
 import android.location.Location
 import android.location.LocationManager
@@ -37,8 +33,6 @@ import androidx.core.view.WindowInsetsCompat
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
-import org.maplibre.android.annotations.Icon
-import org.maplibre.android.annotations.IconFactory
 import org.maplibre.android.annotations.MarkerOptions
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.geometry.LatLng
@@ -170,33 +164,6 @@ class Mainscreen : AppCompatActivity() {
         renderResorts()
     }
 
-    private fun getYellowMarkerIcon(context: Context): Icon {
-        val size = 64
-        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#FFD700")
-            style = Paint.Style.FILL
-        }
-        val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.BLACK
-            style = Paint.Style.STROKE
-            strokeWidth = 4f
-        }
-        canvas.drawCircle(size / 2f, size / 2f, size / 2f - 4f, paint)
-        canvas.drawCircle(size / 2f, size / 2f, size / 2f - 4f, borderPaint)
-
-        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.BLACK
-            textSize = 30f
-            textAlign = Paint.Align.CENTER
-            typeface = Typeface.DEFAULT_BOLD
-        }
-        canvas.drawText("🟡", size / 2f, size / 2f + 10f, textPaint)
-
-        return IconFactory.getInstance(context).fromBitmap(bitmap)
-    }
-
     private fun fetchUserGpsLocationAndInitializeMap() {
         val locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
         val isGpsOn = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) || locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
@@ -238,8 +205,7 @@ class Mainscreen : AppCompatActivity() {
                 map.cameraPosition = cameraPosition
 
                 if (userLoc != null) {
-                    val yellowIcon = getYellowMarkerIcon(this)
-                    map.addMarker(MarkerOptions().position(LatLng(userLoc.latitude, userLoc.longitude)).title("🟡 Your GPS Location").icon(yellowIcon))
+                    map.addMarker(MarkerOptions().position(LatLng(userLoc.latitude, userLoc.longitude)).title("📍 Your GPS Location"))
                 }
 
                 for (resort in allResorts) {
@@ -260,27 +226,6 @@ class Mainscreen : AppCompatActivity() {
 
     private fun updateGpsMap(resort: Resort) {
         currentlySelectedResort = resort
-
-        mapLibreView.getMapAsync { map ->
-            map.setStyle(Style.Builder().fromUri("https://styles.maptoolkit.org/summer.json")) { _ ->
-                map.removeAnnotations()
-
-                val resortPoint = LatLng(resort.latitude, resort.longitude)
-                map.addMarker(MarkerOptions().position(resortPoint).title("📍 ${resort.name}"))
-
-                if (userLocation != null) {
-                    val yellowIcon = getYellowMarkerIcon(this)
-                    val userPoint = LatLng(userLocation!!.latitude, userLocation!!.longitude)
-                    map.addMarker(MarkerOptions().position(userPoint).title("🟡 Your GPS Location").icon(yellowIcon))
-                }
-
-                val cameraPosition = CameraPosition.Builder()
-                    .target(resortPoint)
-                    .zoom(14.0)
-                    .build()
-                map.cameraPosition = cameraPosition
-            }
-        }
 
         var distanceText = ""
         val locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
@@ -395,9 +340,10 @@ class Mainscreen : AppCompatActivity() {
             val baseNum = booking.resort.price.replace(Regex("[^0-9.]"), "").toDoubleOrNull() ?: 2500.0
             val nights = calculateNights(booking.checkInDate, booking.checkOutDate)
             val displayTotal = if (booking.totalPrice > 0.0) booking.totalPrice else (baseNum * booking.pax * nights)
+            val formattedPrice = String.format(Locale.US, "Php %,.2f", displayTotal)
 
             val datesText = TextView(this).apply {
-                text = "Dates: ${booking.checkInDate} to ${booking.checkOutDate} ($nights Night${if (nights > 1) "s" else ""}, ${booking.pax} Pax)\n$statusLabel\nTotal Price: Php %,.2f".format(displayTotal)
+                text = "Dates: ${booking.checkInDate} to ${booking.checkOutDate} ($nights Night${if (nights > 1) "s" else ""}, ${booking.pax} Pax)\n$statusLabel\nTotal Price: $formattedPrice"
                 setTextColor(Color.parseColor(statusColor))
                 textSize = 14f
                 setTypeface(null, Typeface.BOLD)
@@ -476,8 +422,7 @@ class Mainscreen : AppCompatActivity() {
             map.setStyle(Style.Builder().fromUri("https://styles.maptoolkit.org/summer.json")) { _ ->
                 map.removeAnnotations()
                 if (userLocation != null) {
-                    val yellowIcon = getYellowMarkerIcon(this)
-                    map.addMarker(MarkerOptions().position(LatLng(userLocation!!.latitude, userLocation!!.longitude)).title("🟡 Your GPS Location").icon(yellowIcon))
+                    map.addMarker(MarkerOptions().position(LatLng(userLocation!!.latitude, userLocation!!.longitude)).title("📍 Your GPS Location"))
                 }
                 val filtered = allResorts.filter { query.isEmpty() || it.name.contains(query, true) || it.location.contains(query, true) }
                 for (resort in filtered) {
@@ -583,9 +528,10 @@ class Mainscreen : AppCompatActivity() {
 
         val initialNights = calculateNights(checkInDateStr, checkOutDateStr)
         val initialTotal = baseNum * 2 * initialNights
+        val initialFormatted = String.format(Locale.US, "Php %,.2f", initialTotal)
 
         val priceEstimateText = TextView(this).apply {
-            text = "Estimated Total: Php %,.2f (For 2 Pax, $initialNights Nights)".format(initialTotal)
+            text = "Estimated Total: $initialFormatted (For 2 Pax, $initialNights Nights)"
             setTextColor(Color.parseColor("#45ED4D"))
             textSize = 15f
             setTypeface(null, Typeface.BOLD)
@@ -596,7 +542,8 @@ class Mainscreen : AppCompatActivity() {
             val pax = paxInput.text.toString().toIntOrNull() ?: 1
             val nights = calculateNights(checkInDateStr, checkOutDateStr)
             val total = baseNum * (if (pax > 0) pax else 1) * nights
-            priceEstimateText.text = "Estimated Total: Php %,.2f (For $pax Pax, $nights Nights)".format(total)
+            val formatted = String.format(Locale.US, "Php %,.2f", total)
+            priceEstimateText.text = "Estimated Total: $formatted (For $pax Pax, $nights Nights)"
         }
 
         paxInput.addTextChangedListener(object : TextWatcher {
